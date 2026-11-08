@@ -120,7 +120,9 @@ The entry file, the shells, the skill, the hook shapes and the gate runner are h
 - any hook actually installed - `port/hooks/` holds shapes and says so.
 
 `skeleton/scripts/contextctl.py` runs the gates in `GATES.md` over the tree its `context.config.json` names,
-and it moves no file. Gates run at a milestone or when the owner asks, never as a turn-end ritual; this repo's
+and it moves no file. Three config keys change what it looks at: `leaf_pattern` (what counts as a leaf),
+`accepted_absent` (citations a clone cannot resolve) and `extra_checks` (the host's own checks, run under
+`--all`). Gates run at a milestone or when the owner asks, never as a turn-end ritual; this repo's
 own config disables `installed` and `ported` (its shells hold markers by design) and holds `verified` advisory.
 
 ## What the tree does not contain

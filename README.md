@@ -17,7 +17,7 @@ knowledge has to load.
 ```bash
 git clone https://github.com/coji831/agent-context && cd agent-context
 python skeleton/scripts/contextctl.py check --all   # the gates over the shipped tree
-python -m unittest discover -s tests                # 40 tests for the gates themselves
+python -m unittest discover -s tests                # 76 tests for the gates themselves
 ```
 
 **Adopt it:** copy `skeleton/` into your repo root, then follow [`ADOPT.md`](ADOPT.md) - eight steps, and

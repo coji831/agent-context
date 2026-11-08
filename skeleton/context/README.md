@@ -92,6 +92,12 @@ Every leaf carries an **`id`** and a **`brief`** - one line saying what it answe
 and the topic README's index repeats both. That is what makes a leaf citable from a `JOURNEY` entry, which
 names an id and never a line number, and checkable when the leaf is rewritten.
 
+The index's **header names the column holding the file name** (`Leaf`, or `File`); the gate reads that column
+and never assumes the second one, so `| Leaf | What it answers |` and `| id | Leaf | Brief |` both work. A
+table with no header at all is read in the order above, `id | Leaf | Brief`. A **family** `README.md` is an
+index only when its first table names a file column: prose in a table is not a leaf index, and a family
+README without one is not read as one.
+
 `decisions.md` is the one leaf whose **name** is fixed rather than derived from an id; its rows carry the
 ids instead, `D-####`, and a `JOURNEY` entry cites the row it produced. That is also why it is not listed in
 `## Leaves`: the leaf table indexes conclusions, not choices, and a choice is cited by its `D-####` row

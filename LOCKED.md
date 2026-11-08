@@ -51,6 +51,43 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.4 - the gates that measured their own parser
+
+**1.0.4, 2026-11-08.** Seven defects, each measured by adopting v1.0.3 onto a real 11-topic host: every one
+is a gate that reported a fact about its own parsing rather than about the tree it was given.
+
+| Was | Is |
+| --- | --- |
+| `table_rows()` harvested a `Leaf` header as a data row, and `leaf-index`, `shape` and `briefs` read leaf names from **`cells[1]`** whatever the header said. On the host that is **76 of 109** findings - one prose table counted twice, with no true positive available | a header row is the row line a **separator** follows and is never a body row; the leaf column is the header that names a file (`Leaf`, `Leaves`, `File`), with `id` used only when none does, and `id \| Leaf \| Brief` as the fallback when no header is recognised. A **family** README is an index only if its first table names a file column; with no such table it has no index and contributes nothing |
+| `pointers` reported `repos/...` and `state/...` (real directories, `/`-anchored in `.gitignore`, absent from every clone) and `~/...` citations as dead, with no way to accept them: **22 permanent false findings** | `accepted_absent` takes paths, prefixes and globs; a matching citation is accepted and the summary prints how many (`..., 22 accepted absent`); an entry that matches no citation is itself a finding; `~/` and `$HOME/` are always accepted with no config |
+| leaf naming was the hardcoded `^L-\d{4}`, so on a host whose notes are `NN-name.md` **two gates measured nothing** and `verified` printed `ok 11 dated topics, 0 leaves without history` | `leaf_pattern` (default `"^L-\\d{4}"`) builds the matcher in one place; a `topics_dir` holding files and no leaf reports `leaf_pattern "^L-\d{4}" matches none of 115 files under context/topics; the leaf gates checked nothing` |
+| config names were validated **before** gate selection, so `check --only installed` exited 2 with seven errors - the install proof `ADOPT.md` step 6 tells an adopter to run | `--only installed`, run alone, prints each ignored name with `note:` and runs; every other invocation keeps today's strictness |
+| `extra_checks` was checked as a list of gate names, so a host's three own rules were refused and the coverage its retired checker was retired into became unreachable | `extra_checks` takes `"module:function"`, resolved from the host's `scripts/`, and runs under `--all`; a missing module, a missing function and a raising function are findings, never tracebacks |
+| a config written by Windows PowerShell 5.1 carried a BOM and exited 2 with a Python-internal message | read with `utf-8-sig` |
+| the shipped skill said `.context-root` "and `resolve --where` to read it, arrive with `scripts/contextctl.py`" | it says they are **not shipped**, which `MECHANISM.md` already said |
+| `ADOPT.md` answered "the host already has a `context/`" with *stop and report* - the state of every long-lived host | a merge procedure: the dirty-tree problem, keep versus replace, a config translation table, the entry-file merge, the order of operations, the verification |
+
+**Two schema decisions, and the reason for each.**
+
+- **`leaf_pattern` defaults to `^L-\d{4}`** - the value the code already hardcoded - so every existing tree
+  is read exactly as before and the key is a way *out* of the assumption rather than a migration. The
+  alternative, auto-detecting a tree's numbering, guesses at the one thing a gate must not guess: which
+  files it is measuring. Its liveness finding is **advisory**, not blocking, deliberately: a tree drained
+  to its last leaf is legitimately leaf-free, so a blocking finding would fail a correct drain and teach an
+  operator to switch the gate off - the failure the rule exists to prevent. What it replaces was worse:
+  `ok` over an empty set.
+- **`extra_checks` run only under `--all`.** They are a host's own rules, so they are opt-in exactly like
+  the four opt-in gates, and a host that never asked for them is not handed a blocking finding at install.
+  The summary's denominator becomes `9 + the extras that ran`, so a tree with none still prints `N of 9
+  gates ran` and the CI assertion is unchanged - the count of what ran says what ran.
+
+**One attribution corrected.** The experiment's headline cause was "`table_rows()` harvests every table in a
+topic README, not the `## Leaves` table". That is **falsified**: a topic `README.md` was already scoped to
+`## Leaves` by `section_rows`. Only **family** READMEs were read with `table_rows()` over every table. The
+real cause of the 64 `leaf-index` findings is the **column order** (`cells[1]` assumed, header harvested)
+plus, at family level, no rule for which table is the index. Both are fixed above; the family rule is now
+stated in `GATES.md` rather than inherited from an accident of which reader a file went through.
+
 ## 1.0.3 - the stub, the sources, and a record that counts
 
 **1.0.3, 2026-11-08.** The three findings 1.0.2 left to the owner, ruled and applied, plus the count its own

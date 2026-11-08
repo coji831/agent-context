@@ -171,6 +171,8 @@ grep instead of a silent empty rule file.
 ## The gate set, decided elsewhere
 
 **`GATES.md` holds it**, and `skeleton/scripts/contextctl.py` runs it: four gates block on `check`, four more
-on `check --all`, and `installed` guards the install this document describes. This file decides what lands
+on `check --all`, and `installed` guards the install this document describes. A host's **own** rules attach
+through `extra_checks` (`"module:function"`, resolved from the host's `scripts/`) and run under the same
+`--all`, which is how a repo keeps the checks it wrote for itself. This file decides what lands
 where; a gate that judges a landing is that document's subject. The hook block names
 `scripts/contextctl.py` as the command its rows belong to, and says so.
