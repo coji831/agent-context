@@ -294,6 +294,43 @@ class LeafColumns(Base):
         self.assert_passes("check", "--only", "leaf-index")
 
 
+class LinkCells(Base):
+    """A table cell written as a markdown link names the link's target, not the whole cell.
+
+    Writing ``[`01-clusters.md`](./01-clusters.md)`` is the ordinary habit, and on a real host it produced
+    10 findings of ``row names "[`01-clusters.md`](./01-clusters.md)", no such file``. A bare backticked
+    cell must behave exactly as it did.
+    """
+
+    def leaves_section(self, row: str) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n"
+                        "| Leaf | What it answers |\n| --- | --- |\n" + row)
+
+    def test_a_link_cell_resolves(self) -> None:
+        self.leaves_section("| [`L-0001-widget.md`](./L-0001-widget.md) | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_a_link_cell_in_a_family_index_resolves(self) -> None:
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n| id | Leaf | Brief |\n| --- | --- | --- |\n"
+                        "| `L-0002` | [`L-0002-plan.md`](./L-0002-plan.md) | the order of the phases |\n")
+        self.tree.write("context/topics/widget/plan/L-0002-plan.md",
+                        "---\nid: L-0002\nbrief: the order of the phases\n---\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_a_link_to_a_missing_file_names_the_target(self) -> None:
+        self.leaves_section("| [`L-0009-gone.md`](./L-0009-gone.md) | a leaf that is not there |\n")
+        out = self.assert_fails_with('row names "L-0009-gone.md", no such file',
+                                     "check", "--only", "leaf-index")
+        self.assertEqual(out.count("no such file"), 1, out)
+        self.assertNotIn("](", out)
+
+    def test_a_bare_backtick_cell_is_unchanged(self) -> None:
+        self.leaves_section("| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+
 ID_ONLY_README = ("# widget\n\nVerified: {today}\n\n## Leaves\n\n"
                   "| id | Brief |\n| --- | --- |\n| `NN-01` |  |\n")
 

@@ -43,6 +43,11 @@ once: `no column names a file, so this table cannot index leaves; its header is 
 names the header it read, so a reader knows what to change, and one finding is right because the defect is
 the table's shape, not its contents: no row is resolved and no unlisted-leaf sweep runs for that README.
 `id` beside a file column - `id | Leaf | Brief` - is the documented shape and is read exactly as before.
+A cell written as a **markdown link** names the link's **target**, with any `./` prefix stripped:
+`` [`01-clusters.md`](./01-clusters.md) `` resolves to `01-clusters.md`. Writing a table cell as a link is
+the ordinary habit, and reading the whole cell as a file name reported 10 false findings on a real host -
+`row names "[`01-clusters.md`](./01-clusters.md)", no such file`. A cell with no link keeps the old
+reading exactly, and a link whose target does not exist is still one finding, naming the target.
 A row line that a separator line follows is a **header**, so it is never a body row. A table with
 no separator anywhere is read in the contract's own order, `id | Leaf | Brief` - the leaf column is the
 second - so a hand-written table without a header is still read and no column is ever invented.

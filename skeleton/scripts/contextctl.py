@@ -298,6 +298,24 @@ def brief_column(header: list[str] | None, leaf: int) -> int:
     return leaf + 1
 
 
+LINK_CELL = re.compile(r"^\s*\[[^\]]*\]\(\s*([^)\s]+)[^)]*\)\s*$")
+
+
+def cell_name(cell: str) -> str:
+    """The file name a table cell names: a markdown link's target, else the cell's own text.
+
+    ``[`01-clusters.md`](./01-clusters.md)`` is the ordinary way to write a link in a table, and reading
+    the whole cell as a file name reported every such row as a missing file. A cell with no link keeps
+    today's reading exactly: backticks stripped, whitespace trimmed.
+    """
+    text = cell.strip()
+    link = LINK_CELL.match(text)
+    if link:
+        text = link.group(1)
+    text = text.strip("`").strip().split("#")[0]
+    return text[2:] if text.startswith("./") else text
+
+
 def rule_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
     """Top-level list items with their indented continuation lines."""
     blocks: list[tuple[int, list[str]]] = []
@@ -502,7 +520,7 @@ def gate_leaf_index(ctx: Ctx) -> Result:
                 for number, cells in rows:
                     if len(cells) <= column:
                         continue
-                    leaf_name = cells[column].strip("`").strip()
+                    leaf_name = cell_name(cells[column])
                     listed.append(leaf_name)
                     if not (index.parent / leaf_name).exists():
                         findings.append(Finding(gate, ctx.rel(index), number,
@@ -667,7 +685,7 @@ def gate_briefs(ctx: Ctx) -> Result:
                 column = 1
             for number, cells in rows:
                 if len(cells) > column:
-                    row_line[cells[column].strip("`").strip()] = number
+                    row_line[cell_name(cells[column])] = number
         own = [leaf for leaf in ctx.topics_of(topic) if leaf.brief]
         briefs += len(own)
         for index, first in enumerate(own):
