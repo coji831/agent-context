@@ -1,0 +1,22 @@
+# EXAMPLE ONLY - a shape to adapt, not a workflow to copy verbatim.
+#
+# Intent: gate the merge. The only level that cannot be skipped locally, so it is where the opt-in
+# checks belong: they guard a surface that changes when a file is added, not on every wrap-up.
+
+name: context
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: memory tree is consistent
+        run: python scripts/contextctl.py check --all

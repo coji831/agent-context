@@ -1,0 +1,21 @@
+{
+  "_comment": "EXAMPLE ONLY - a shape to adapt, not a file to copy blind. Copy to <repo>/.cursor/hooks.json (project level) or the user-level equivalent. Event names below are verified (Cursor hooks docs, 2026-11-07); the payload schema is not.",
+  "_intent": [
+    "sessionStart -> regenerate the digest a new session would read, so it is never the stale copy",
+    "stop -> check --all --warn: every finding surfaces, nothing blocks the turn. A stop hook cannot undo work that already ran",
+    "preToolUse is the only real veto here; use it only for a check that must prevent a write, never for a warning",
+    "whether anything DOES block is a config decision, not a decision for this file"
+  ],
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "python scripts/contextctl.py brief"
+      }
+    ],
+    "stop": [
+      {
+        "command": "python scripts/contextctl.py check --all --warn"
+      }
+    ]
+  }
+}

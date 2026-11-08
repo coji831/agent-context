@@ -1,0 +1,21 @@
+{
+  "_comment": "EXAMPLE ONLY - a shape to adapt. Copy to <repo>/.codex/hooks.json. The EVENT NAMES below are verified (Codex hooks docs, 2026-11-07); the per-hook object shape is not - read the hook schema before trusting this file, and prefer one representation per layer (hooks.json OR an inline [hooks] table in config.toml, never both: Codex merges them and warns at startup).",
+  "_intent": [
+    "SessionStart -> regenerate the digest a new session would read, so it is never the stale copy",
+    "Stop -> check --all --warn: every finding surfaces, nothing blocks the turn. A Stop hook cannot undo work that already ran, and a blocked turn is an outage",
+    "non-managed hooks must be reviewed and trusted before they run, so the first install is a human step, not an agent one",
+    "whether anything DOES block is a config decision, not a decision for this file"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "python scripts/contextctl.py brief"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "python scripts/contextctl.py check --all --warn"
+      }
+    ]
+  }
+}
