@@ -51,6 +51,31 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.7 - the block nobody counted
+
+**1.0.7, 2026-11-08.** Two defects in the one gate that decides whether the tree arrived at all. Both are
+states review cannot see and no other gate measured: draft the entry file into a tree twice and every gate
+still passed, and replace the block's contents with nothing and every gate still passed.
+
+| Was | Is |
+| --- | --- |
+| `installed` asked only whether the strings `<!-- context:begin -->` and `<!-- context:end -->` were **present**, so a duplicated block - the exact failure `ADOPT.md` step 5 says the markers exist to prevent - passed with `0 blocking findings`, as did an empty block and a block whose `end` preceded its `begin`. Step 5's hand `git diff` was the only thing that could catch any of them | the markers are **counted**: exactly one of each, `end` after `begin`, and something between them. A duplicate reports the line of the second block and says the upsert ran twice; an empty block says the routing table never reached the agent |
+| the gate's summary line was `{len(shells)} shells filled`, hard-coded, so a run whose findings were all `named in shells, absent` still printed `4 shells filled` beside them | it counts the shells that arrived: `0 of 4 shells filled` for a failed install, `4 of 4` for a complete one |
+
+**Measured on a correct install, before the fix.** A duplicated entry block and an emptied entry block each
+produced `0 blocking findings; 9 of 9 gates ran` and exit 0 - reproduced in a scratch host built from
+`skeleton/` with `shells: []`, then again after the fix, where the two states now exit 1 and print the line of
+the offending block. The first reading came from `ADOPT.md` step 5, which states the rule the gate did not
+enforce; the gap was confirmed by breaking a copy, never the locked tree.
+
+**What this does not close.** `ported` still accepts any well-formed date, including one in the future
+(`2031-01-01` passes), and the entry block's *content* is still unmeasured - a block holding a host's
+instructions is present whether or not it says anything true. Both are recorded here rather than fixed,
+because a gate needs a failing case behind it and neither has been seen to bite.
+
+**Tests: 98 before, 103 after.** Five new, each red before the fix: a second block, markers that are counted
+rather than present, an empty block, an `end` before its `begin`, and a missing shell printing `0 of 1`.
+
 ## 1.0.6 - the dates a clone invented, and the CI nobody asked for
 
 **1.0.6, 2026-11-08.** Four defects, all found by porting v1.0.5 onto a real 11-topic host with real history -

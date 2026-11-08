@@ -67,10 +67,14 @@ leaf index.
 **`installed`**, not in the table because it never judges the tree - it judges whether the tree arrived, and
 it is **host only**, **rated once**, and here **disabled** with the reason recorded. It asserts that every
 path in `shells` exists, holds no `<!-- PORT:` marker, and is one of the two legal fills - the block body, or
-a pointer whose first backticked path resolves - and that `entry_file` carries its marked block. It runs on
+a pointer whose first backticked path resolves - and that `entry_file` carries **exactly one** marked block,
+holding something. The markers are counted, not merely found: a second block is an upsert that ran twice, an
+empty block is a host whose routing table was replaced with nothing, and a `begin` after its `end` is no block
+at all - three states review cannot see and, until 1.0.7, only step 5's hand `git diff` caught. It runs on
 **every** invocation, `--only` included, and refuses `--skip`: it is the precondition of every other
 denominator, since a tree whose shells were never filled gives the agent a comment where its rules should be.
-It prints `FAIL installed .claude/rules/context.md:4: still contains "<!-- PORT: context-rules -->"; the routing table never reached the agent`. It is
+It prints `FAIL installed .claude/rules/context.md:4: still contains "<!-- PORT: context-rules -->"; the routing table never reached the agent`. Its summary line counts the shells that arrived, so `0 of 4 shells filled`
+is a failed install and not a tidy one. It is
 the only mechanism here that fires without being selected, and every disable is echoed in the summary line.
 
 ## The three owed decisions
@@ -207,7 +211,7 @@ the old path. Either way `context/topics/INDEX.md` line 9 says `pricing/` and no
 
 ```
 $ contextctl check
-installed    ok    4 shells filled, entry block present
+installed    ok    4 of 4 shells filled, entry block present
 register     FAIL  13 folders, 13 rows
   context/topics/INDEX.md:9: row names "pricing/", no such folder
 leaf-index   ok    12 topics, 27 leaves
