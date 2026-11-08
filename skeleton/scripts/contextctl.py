@@ -887,11 +887,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f'error: unknown gate(s): {", ".join(unknown)}', file=sys.stderr)
         print(f"known gates: {', '.join(known_names())}", file=sys.stderr)
         return 2
+    # `--only installed` is the install proof ADOPT tells an adopter to run, and it consults no list the
+    # problems can name: a host's legacy config must not preempt it. Any other invocation stays strict.
+    install_proof = bool(args.only) and set(args.only) == {"installed"} and not args.skip
     if problems:
-        for line in problems:
-            print(f"error: {line}", file=sys.stderr)
-        print(f"known gates: {', '.join(known_names())}", file=sys.stderr)
-        return 2
+        if install_proof:
+            for line in problems:
+                print(f"note: {line} (ignored: --only installed never consults it)", file=sys.stderr)
+        else:
+            for line in problems:
+                print(f"error: {line}", file=sys.stderr)
+            print(f"known gates: {', '.join(known_names())}", file=sys.stderr)
+            return 2
 
     try:
         chosen, disabled = select(cfg, args)

@@ -627,6 +627,45 @@ class Archive(Base):
         self.assertIn("context/topics/archive: topic has no README.md", out)
 
 
+class InstallProof(Base):
+    """`check --only installed` is the runbook's install proof, so a legacy config may not preempt it.
+
+    Measured on the real host: seven `is not a gate this tool has` errors and exit 2 for `--all` **and**
+    for `--only installed` - the command ADOPT step 6 tells an adopter to run.
+    """
+
+    def legacy(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"],
+                          "checks_advisory": ["budget", "journey"],
+                          "checks_disabled": ["leaves"],
+                          "extra_checks": ["shell_checks:refs"]})
+
+    def test_only_installed_runs_despite_unknown_names(self) -> None:
+        self.legacy()
+        code, out = self.tree.run("check", "--only", "installed")
+        self.assertEqual(code, 0, out)
+        self.assertIn("installed    ok", out)
+
+    def test_the_ignored_names_are_printed_not_swallowed(self) -> None:
+        self.legacy()
+        code, out = self.tree.run("check", "--only", "installed")
+        self.assertEqual(code, 0, out)
+        self.assertIn("note:", out)
+        self.assertIn('"budget" is not a gate this tool has', out)
+
+    def test_any_other_invocation_keeps_todays_strictness(self) -> None:
+        self.legacy()
+        code, out = self.tree.run("check")
+        self.assertEqual(code, 2, out)
+        self.assertIn("error:", out)
+
+    def test_a_bom_encoded_config_is_read(self) -> None:
+        path = self.tree.root / "context.config.json"
+        payload = {"shells": [".claude/rules/context.md"]}
+        path.write_bytes(b"\xef\xbb\xbf" + json.dumps(payload).encode("utf-8"))
+        self.assert_passes("check")
+
+
 class Cli(Base):
     def test_unknown_gate_exits_two(self) -> None:
         code, out = self.tree.run("check", "--only", "registr")

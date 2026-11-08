@@ -157,6 +157,11 @@ no tree root can resolve one.
 **A config that names a gate which does not exist fails loudly.** Any unknown name, in `checks_disabled`,
 `checks_advisory`, `extra_checks`, `--only` or `--skip`, exits **2** and lists every known name, the eight
 gates and `installed`, so a typo never reads as a pass and a hook naming a removed gate learns on run one.
+**The one exception is `--only installed`, run alone**: it is the install proof `ADOPT.md` step 6 tells an
+adopter to run, and it never consults those lists, so a host carrying its own legacy gate names still gets
+its install checked - each ignored name is printed to stderr with `note:` and never silently dropped. Any
+other invocation is strict. A config carrying a UTF-8 BOM is read (`utf-8-sig`): Windows PowerShell 5.1's
+`Set-Content -Encoding utf8` writes one, and a config that cannot be read is an install that cannot be proven.
 No key creates a file: `inbox`, `briefing` and `state/` are not config, none being an artefact here.
 
 ## One worked failure, end to end
