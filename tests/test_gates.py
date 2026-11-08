@@ -415,6 +415,45 @@ class IdOnlyTable(Base):
         self.assertNotIn("README.md:", out)
 
 
+class LeafIdMessage(Base):
+    """`shape` names the id the configured pattern asks for, not the default one a host does not use.
+
+    `leaf_pattern` was honoured by the file matcher and not by this message, so a host numbering its notes
+    `NN-name.md` was told to add `id: L-####` - an id shape its own config says it does not use.
+    """
+
+    def numbered(self, body: str) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^\\d{2}-"})
+        self.tree.write("context/topics/widget/01-scheduler.md", body)
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n| Leaf | What it answers |\n"
+                        "| --- | --- |\n| `01-scheduler.md` | what the batch size measured |\n")
+
+    def test_a_configured_pattern_is_named_not_the_default(self) -> None:
+        self.numbered("---\nbrief: what the batch size measured\n---\n")
+        out = self.assert_fails_with("no leaf id in the frontmatter", "check", "--only", "shape")
+        self.assertIn("\\d{2}-", out)
+        self.assertNotIn("L-####", out)
+
+    def test_the_message_names_both_legal_forms(self) -> None:
+        self.numbered("---\nbrief: what the batch size measured\n---\n")
+        code, out = self.tree.run("check", "--only", "shape")
+        self.assertEqual(code, 1, out)
+        self.assertIn("`01-`", out)
+        self.assertIn("file stem `01-scheduler`", out)
+
+    def test_either_form_is_accepted(self) -> None:
+        self.numbered("---\nid: 01-scheduler\nbrief: what the batch size measured\n---\n")
+        self.assert_passes("check", "--only", "shape")
+
+    def test_the_default_pattern_still_names_L_hyphen(self) -> None:
+        self.tree.write("context/topics/widget/L-0001-widget.md", "---\nbrief: b\n---\n")
+        code, out = self.tree.run("check", "--only", "shape")
+        self.assertEqual(code, 1, out)
+        self.assertIn("`id: L-####`", out)
+        self.assertIn("file stem `L-0001-widget`", out)
+
+
 class Shape(Base):
     def test_leaf_without_brief(self) -> None:
         self.tree.write("context/topics/widget/L-0001-widget.md", "---\nid: L-0001\n---\nbody\n")

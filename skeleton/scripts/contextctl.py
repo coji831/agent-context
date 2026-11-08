@@ -542,6 +542,21 @@ def gate_leaf_index(ctx: Ctx) -> Result:
     return Result(gate, findings, scanned, f"{len(ctx.topics)} topics, {len(ctx.leaves)} leaves")
 
 
+def leaf_id_message(cfg: dict, leaf: Leaf, match: "re.Match[str] | None") -> str:
+    """What a leaf's id must be, stated in the terms of the `leaf_pattern` actually in force.
+
+    The rule is `id == the pattern's match` or `id == the file stem`. A hardcoded `L-####` told a host
+    numbering its notes `NN-name.md` to add an id shape its own config says it does not use.
+    """
+    pattern = str(cfg["leaf_pattern"])
+    if pattern == LEAF_PATTERN:
+        lead = "no `id: L-####` in the frontmatter or the first two lines"
+    else:
+        lead = f'no leaf id in the frontmatter or the first two lines; `leaf_pattern` is "{pattern}"'
+    matched = f"`{match.group(0)}`" if match else "the file name"
+    return f"{lead}: the id must be {matched} (what `leaf_pattern` matches) or the file stem `{leaf.path.stem}`"
+
+
 def gate_shape(ctx: Ctx) -> Result:
     gate = "shape"
     findings = []
@@ -550,8 +565,7 @@ def gate_shape(ctx: Ctx) -> Result:
         examined += 1
         match = ctx.leaf_file.match(leaf.path.name)
         if not leaf.id:
-            findings.append(Finding(gate, leaf.rel, 1,
-                                    "no `id: L-####` in the frontmatter or the first two lines"))
+            findings.append(Finding(gate, leaf.rel, 1, leaf_id_message(ctx.cfg, leaf, match)))
         elif match and leaf.id != match.group(0) and leaf.id != leaf.path.stem:
             findings.append(Finding(gate, leaf.rel, 1,
                                     f"id {leaf.id} does not match the file name ({match.group(0)})"))
