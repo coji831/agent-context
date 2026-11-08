@@ -90,9 +90,9 @@ entry file fails with `entry file not found` until you change it.
 
 **Add-on - the host already has whichever file its harness reads** - **upsert, never overwrite**:
 
-- both `<!-- context:begin -->` and `<!-- context:end -->` present → replace **only** what is between them;
-- neither present → append the whole block;
-- **exactly one present → stop and report.** A lone marker is an interrupted merge, and guessing
+- both `<!-- context:begin -->` and `<!-- context:end -->` present -> replace **only** what is between them;
+- neither present -> append the whole block;
+- **exactly one present -> stop and report.** A lone marker is an interrupted merge, and guessing
   duplicates the block.
 
 Then run the upsert twice and `git diff`: the second run must be a no-op. A second block is the failure the
