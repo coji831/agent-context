@@ -12,9 +12,17 @@ on:
 
 jobs:
   check:
+    # The check-run name is THIS line, not `name:` above - the workflow name is not reported as a check.
+    # Make it the *required status check* named in the host's branch protection, or the job runs green
+    # and the pull request still never satisfies the requirement.
+    name: context
     runs-on: ubuntu-latest
     steps:
+      # Full history, because some gates date a file by its last commit and a depth-1 clone cannot
+      # answer that - the gate then reports the history as unavailable on every push (see `GATES.md`).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

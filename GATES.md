@@ -98,8 +98,8 @@ invisible by construction - a placeholder is a legal comment whose absence of ru
 A gate must have a non-zero denominator: a gate that measures nothing reports success, and one that scans
 zero files has silently passed. Three obligations, and they bind the tool:
 
-1. **Every gate counts its subjects and prints the count in its OK line**: `OK leaf-index 12 topics, 27
-   leaves`; `OK pointers 88 tokens in 9 files`. The summary's denominator is **all nine known names**, never
+1. **Every gate counts its subjects and prints the count in its OK line**: `ok leaf-index 12 topics, 27
+   leaves`; `ok pointers 88 cited paths in 9 files`. The summary's denominator is **all nine known names**, never
    the number that ran, so `check` says `5 of 9` and only `--all` says `9 of 9`: a ratio of one is no reading.
 2. **Zero subjects is reported, and it blocks only where the location is absent**: `FAIL caps 0 artefacts;
    that location does not exist, and a gate that scanned nothing has not passed` is a misconfiguration, while
@@ -133,7 +133,7 @@ the old path. Either way `context/topics/INDEX.md` line 9 says `pricing/` and no
 ```
 $ contextctl check
 installed    ok    4 shells filled, entry block present
-register     FAIL  1 finding  (13 folders, 13 rows)
+register     FAIL  13 folders, 13 rows
   context/topics/INDEX.md:9: row names "pricing/", no such folder
 leaf-index   ok    12 topics, 27 leaves
 shape        ok    41 files

@@ -73,8 +73,7 @@ neither helps - there is no start file to scope and no event to hang a hook on.
 
 ## 2. Per harness: the file that must exist
 
-The per-harness table came from the adoption runbook (`agent/WIRING.md`, still readable from `54ba837`),
-which warned that **the paths move; the shape does not**. Each path below is either re-verified against
+**The paths move; the shape does not.** Each path below is either re-verified against
 the vendor's own documentation on 2026-11-07, or marked unverified - nothing is asserted and then hidden.
 
 | Harness | File that must exist | Where | Path-scoped rules | Silently, without it | Verified |

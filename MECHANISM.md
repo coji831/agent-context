@@ -15,7 +15,7 @@ Four questions in a fixed order, and the answer always names a file:
 
 | # | Question | If the answer is no |
 | --- | --- | --- |
-| 1 | Does a topic own this? | do the work, write nothing durable, say so |
+| 1 | Does a topic own this? | the routing table decides: a fact spanning topics is a `MEMORY.md` line; a decision with no topic creates it in that turn, with its register row |
 | 2 | Is it durable at all? | write nowhere, and never restate it as recorded |
 | 3 | Which kind is it: fact, area rule, leaf, decision, procedure? | then it is not durable yet; write nowhere |
 | 4 | Is it mine to write? | a requirement is never edited; the code beats prose |

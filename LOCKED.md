@@ -51,6 +51,54 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.2 - the template that gated nothing
+
+**1.0.2, 2026-11-08.** Three defects, and the first was in the file a *host* copies rather than in this
+repo's own: 1.0.1 fixed the check-run name here and left the same trap, twice, in `port/hooks/ci.yml`.
+
+| Was | Is |
+| --- | --- |
+| `port/hooks/ci.yml` declared its job `check:` with no `name:`, so the job reported a check called `check` and an adopter's required status check named `context` never reported; and it checked out at depth 1, so the date gate found no commit date on any leaf and blocked every push | the job is named for the required check and checkout sets `fetch-depth: 0`, each with one comment saying why it is load-bearing and `GATES.md` named rather than the spec restated |
+| `MECHANISM.md` Q1 answered "no" with *do the work, write nothing durable, say so* - contradicting the ruling that a decision with no owning topic creates it in that turn with its register row, and contradicting `T1` two screens below it | the routing table is the authority: a fact spanning topics is a `MEMORY.md` line, and a decision with no topic creates it with its row. The restatement is replaced by the reference, the fix used at `git mv` in 1.0.1 |
+| three hook examples wired `contextctl.py brief` with no marker in the file a host copies; only `port/hooks/README.md` and `port/blocks/hook-commands.md` said the command is not shipped | every hook JSON carries the marker, so the shape cannot be mistaken for a working command by a reader who copied it |
+
+### The guard, made mechanical
+
+A comment in this repo's own workflow did not stop the trap surviving 1.0.1, so it is measured now.
+`tests/test_gates.py::ShippedWorkflows` reads both shipped workflows - `.github/workflows/context.yml` and
+`port/hooks/ci.yml`, **2 files**, both asserted - for (a) the job's `name:` equal to the workflow's `name:`,
+and (b) a checkout step that sets `fetch-depth: 0`. Each of the four lines was deleted locally, one at a
+time, and the suite failed each time; restored, both tests pass. **The first draft of the depth assertion
+passed a workflow whose only `fetch-depth: 0` was inside the comment above the step**, so the assertion is
+anchored to a YAML line rather than to a substring - a guard that a comment satisfies is not a guard.
+
+### The merge is blocked by a *failing* check, re-proved
+
+The 1.0.1 proof was confounded: a pull request was refused while the required check `context` did not exist
+at all, so nothing observed showed that a failing gate blocks. Re-run on `prove-gate-blocks`, one commit off
+`main`, adding a register row for a folder that does not exist:
+
+| Observation | Measured |
+| --- | --- |
+| the gate fails locally, before CI is asked | `register FAIL 1 folders, 2 rows`; `check --all` exits **1**, `1 blocking finding; 7 of 9 gates ran` |
+| the required check reports, and reports failure | check-run **`context`**, conclusion **FAILURE**, run `42476747052`, PR #3 |
+| the refusal is not `strict` demanding an up-to-date branch | `mergeable: MERGEABLE`, `mergeStateStatus: BLOCKED`, `ahead=1 behind=0` - the out-of-date state is `BEHIND`, and this is not it |
+| the merge refuses | `X Pull request coji831/agent-context#3 is not mergeable: the base branch policy prohibits the merge.` |
+| the cause is readable in the log | `skeleton/context/topics/INDEX.md:13: row names "context/topics/pricing/", no such folder` then `1 blocking finding` |
+
+Closed unmerged, branch deleted; `main`'s head check-run was `context: success` again afterwards.
+
+### The sweep, with its denominator
+
+**49 tracked files** read for the same class - a claim the repo cannot satisfy - with every path-like
+citation in the 32 Markdown files resolved against the tree each one addresses: **142 resolved, 15 not.**
+Fourteen of the fifteen are host destinations or illustrative host trees and are correct as written. The
+one defect was a provenance pointer: `AGENTIC-SYSTEM.md` cited `agent/WIRING.md`, "still readable from
+`54ba837`", and neither that file nor that commit exists in this repository - the pointer is gone and its
+one claim kept. Two more mechanical findings came from the same pass: `port/hooks/README.md` pointed at
+`../copilot/hooks/`, a folder this repo does not ship, and `GATES.md` quoted a register line as `1 finding
+(13 folders, 13 rows)` and a pointers line as `88 tokens in 9 files`, neither of which the tool prints.
+
 ## 1.0.1 - the first patch
 
 **1.0.1, 2026-11-08.** Three defects, none of them found by a gate, and one rule that was never stated: a

@@ -3,7 +3,7 @@
 > **These are examples, not installers.** Adopting the tree wires nothing up. A hook is the one part of an
 > agent system that cannot be portable: event names, payload shapes and failure semantics differ per
 > harness, so the *shared* part is the intent and the scripts, and the *per-harness* part is the wiring -
-> `../copilot/hooks/` for a Copilot-shaped host, and nothing else here assumes one.
+> `copilot-vscode-hooks.json` in this folder for a Copilot-shaped host, and nothing else here assumes one.
 >
 > **Every command below calls `scripts/contextctl.py`, which ships its `check` commands and not `brief`.**
 > Read the ones it cannot run as the intended shape; a hook that runs a missing command fails loudly, which
