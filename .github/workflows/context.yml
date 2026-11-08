@@ -11,6 +11,9 @@ on:
 
 jobs:
   check:
+    # Named to match the required status check on main. A job's display name is the check-run name, so
+    # renaming this line silently un-gates the merge.
+    name: context
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 is load-bearing, not tidiness. `verified` asks git for each leaf's last commit
