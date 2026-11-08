@@ -38,4 +38,5 @@ file you are editing**, and stop at the repo boundary. A workspace holding more 
   into another's memory.
 
 > If a workspace ever nests two trees, a `.context-root` marker settles which one owns a path; it, and
-> `resolve --where` to read it, arrive with `scripts/contextctl.py`.
+> `resolve --where` to read it, are **not shipped yet** - `contextctl.py` runs `check` and a `brief` stub,
+> and `resolve` is not written, so the marker is a design this tree names and no copy carries.
