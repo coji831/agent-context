@@ -1,0 +1,31 @@
+{
+  "_comment": "The config a host starts with: copy it with skeleton/ and fill the two values MANIFEST names - `port_target` and each shell's `ported:` line, both filled in ADOPT step 6. Paths are the host's own, so `python scripts/contextctl.py check --only installed` fails until the markers are gone, which is the install check.",
+  "memory": "context/MEMORY.md",
+  "root_rules": "context/MUST-KNOW.md",
+  "index_of_topics": "context/topics/INDEX.md",
+  "topics_dir": "context/topics",
+  "entry_file": "AGENTS.md",
+  "shells": [
+    ".github/instructions/context.instructions.md",
+    ".claude/rules/context.md",
+    ".cursor/rules/context.mdc",
+    ".windsurf/rules/context.md"
+  ],
+  "port_target": null,
+  "checks_disabled": [],
+  "checks_advisory": [],
+  "extra_checks": [],
+  "artefacts": {
+    "README.md": {"max_lines": 80},
+    "HANDOFF.md": {"max_lines": 90, "requires": ["## Now"]},
+    "MUST-KNOW.md": {"max_rules": 25, "max_rule_chars": 640},
+    "JOURNEY.md": {},
+    "decisions.md": {}
+  },
+  "root_artefacts": {
+    "MEMORY.md": {"max_lines": 150},
+    "MUST-KNOW.md": {"max_rules": 10, "max_rule_chars": 640}
+  },
+  "leaves": {"max_lines": 120},
+  "briefs": {"threshold": 0.82}
+}

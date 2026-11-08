@@ -1,0 +1,25 @@
+{
+  "_comment": "EXAMPLE ONLY - a shape to adapt, not a file to copy. It lives in port/ because VS Code's hook file path is NOT verified: the hook surface is documented as preview and no repository-level path could be confirmed. Find the real path in your harness's own documentation and place it there. Hook JSON is not portable: event names, payloads and failure semantics differ per harness.",
+  "_intent": [
+    "sessionStart -> regenerate the digest a new session would read, so it is never the stale copy",
+    "agentStop -> check --all --warn: every finding surfaces as a message, nothing blocks the turn. A stop event cannot undo work that already ran, and a blocked turn is an outage",
+    "never auto-commit a generated digest: the check exists to make a missing handoff visible",
+    "whether anything DOES block is a config decision, not a decision for this file"
+  ],
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "python scripts/contextctl.py brief",
+        "timeout": 30
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "command": "python scripts/contextctl.py check --all --warn",
+        "timeout": 60
+      }
+    ]
+  }
+}

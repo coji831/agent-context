@@ -1,0 +1,26 @@
+{
+  "_comment": "This repository's own config: the gates read the shipped tree under skeleton/context/, not a host's context/. The host's starting config is the separate skeleton/context.config.json, which points at its own context/ and is copied with skeleton/. `installed` and `ported` are disabled here because skeleton/ shells hold their <!-- PORT: --> markers and no fill date by design (MANIFEST § Install) - this repo ships shells, a host ships fills. `verified` is advisory because the sample topic carries a placeholder Verified: 2026-01-01 rather than the date it was last read. Every silence is echoed in the run's summary line.",
+  "memory": "skeleton/context/MEMORY.md",
+  "root_rules": "skeleton/context/MUST-KNOW.md",
+  "index_of_topics": "skeleton/context/topics/INDEX.md",
+  "topics_dir": "skeleton/context/topics",
+  "entry_file": "skeleton/AGENTS.md",
+  "shells": [],
+  "port_target": null,
+  "checks_disabled": ["installed", "ported"],
+  "checks_advisory": ["verified"],
+  "extra_checks": [],
+  "artefacts": {
+    "README.md": {"max_lines": 80},
+    "HANDOFF.md": {"max_lines": 90, "requires": ["## Now"]},
+    "MUST-KNOW.md": {"max_rules": 25, "max_rule_chars": 640},
+    "JOURNEY.md": {},
+    "decisions.md": {}
+  },
+  "root_artefacts": {
+    "MEMORY.md": {"max_lines": 150},
+    "MUST-KNOW.md": {"max_rules": 10, "max_rule_chars": 640}
+  },
+  "leaves": {"max_lines": 120},
+  "briefs": {"threshold": 0.82}
+}

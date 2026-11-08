@@ -1,0 +1,7 @@
+# Every file is stored and checked out as LF. The hook shapes in port/hooks/ run under bash, and a CRLF
+# shebang fails with `$'\r': command not found` - a file that looks installed and cannot run.
+* text=auto eol=lf
+
+# PowerShell is the exception: a .ps1 is read by Windows PowerShell, which tolerates either, but CRLF is
+# what its own tooling writes back.
+*.ps1 text eol=crlf

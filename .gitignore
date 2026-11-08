@@ -1,0 +1,6 @@
+# Caches, never content. The gate runner and its tests are stdlib-only, so the only build residue is a
+# Python bytecode cache, and a .pyc committed once is a diff nobody reads and a file every tool rewrites.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

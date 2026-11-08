@@ -1,0 +1,6 @@
+# Caches, never content. The gate runner is stdlib-only, so the only build residue is a Python bytecode
+# cache - which `cp -r skeleton/scripts` would otherwise carry into a host.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

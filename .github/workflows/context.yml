@@ -1,0 +1,28 @@
+# This repo's own check, not an adopter's: the gates read the shipped tree under skeleton/context/
+# (see context.config.json), so a change to the tree or to the port text is measured before it lands.
+# A host copies port/hooks/ci.yml instead, which points at its own context/.
+
+name: context
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 is load-bearing, not tidiness. `verified` asks git for each leaf's last commit
+      # date (`git log -1 --format=%cs -- <leaf>`); on the default depth-1 clone a leaf untouched in
+      # HEAD returns nothing and the gate reports "git history unavailable" on every push.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: the shipped tree is consistent
+        run: python skeleton/scripts/contextctl.py check --all
+      - name: the gates pass their own tests
+        run: python -m unittest discover -s tests
