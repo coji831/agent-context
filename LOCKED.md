@@ -51,16 +51,43 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.3 - the stub, the sources, and a record that counts
+
+**1.0.3, 2026-11-08.** The three findings 1.0.2 left to the owner, ruled and applied, plus the count its own
+record had got wrong.
+
+| Was | Is |
+| --- | --- |
+| the hook examples wired `contextctl.py brief`, and no build shipped the command; a comment said so, while the executable line still named a subcommand that dies on an unknown choice | `brief` is a **stub**: it writes no digest, compares none, prints one message to stderr and exits **0** - deliberately, because a failing session-start hook blocks the session it is starting. Four tests hold it, one of them asserting it changes no file |
+| `AGENTIC-SYSTEM.md` justified its harness table as "2026-11-07, <vendor> docs" with no document a reader could open, once 1.0.2 removed the provenance pointer | numbered **Sources** under the table, fetched 2026-11-08, each stating only what it settles |
+| `skeleton/.claude/rules/context.md` carried `<!-- unverified: … -->` for a key its own frontmatter already used | the marker is deleted: `paths` is documented as **the only rule field Claude reads** |
+
+**Two claims moved with the citations, one in each direction, and that is the point.** Claude's glob key left
+its queue - `unverified` -> `paths:`, stated by two vendors and now loaded by the shipped shell. Copilot's
+"nearest in the directory tree wins" lost its parenthetical - no fetched source states a precedence between
+nested `AGENTS.md` files, so it is marked **unverified** instead of kept from memory. `MANIFEST.md`'s rank
+table, capability matrix and V2 row were brought to the same answer, so one fact no longer has two
+strengths.
+
+**The count.** 1.0.2's intro said *three defects* while its table and sweep had fixed six. It now says what the
+release did, and its table carries all six rows.
+
 ## 1.0.2 - the template that gated nothing
 
-**1.0.2, 2026-11-08.** Three defects, and the first was in the file a *host* copies rather than in this
-repo's own: 1.0.1 fixed the check-run name here and left the same trap, twice, in `port/hooks/ci.yml`.
+**1.0.2, 2026-11-08.** Two of these defects were in the file a *host* copies rather than in this repo's own:
+1.0.1 fixed the check-run name here and left the same trap, twice, in `port/hooks/ci.yml`. Four more came
+from a sweep for one class - a claim the repo cannot satisfy - and after the fixes came the guard that keeps
+the first two from returning, and a re-run of a proof that had been confounded. The table is the whole
+act-inventory of the release; the sweep's denominator is below it.
 
 | Was | Is |
 | --- | --- |
 | `port/hooks/ci.yml` declared its job `check:` with no `name:`, so the job reported a check called `check` and an adopter's required status check named `context` never reported; and it checked out at depth 1, so the date gate found no commit date on any leaf and blocked every push | the job is named for the required check and checkout sets `fetch-depth: 0`, each with one comment saying why it is load-bearing and `GATES.md` named rather than the spec restated |
 | `MECHANISM.md` Q1 answered "no" with *do the work, write nothing durable, say so* - contradicting the ruling that a decision with no owning topic creates it in that turn with its register row, and contradicting `T1` two screens below it | the routing table is the authority: a fact spanning topics is a `MEMORY.md` line, and a decision with no topic creates it with its row. The restatement is replaced by the reference, the fix used at `git mv` in 1.0.1 |
 | three hook examples wired `contextctl.py brief` with no marker in the file a host copies; only `port/hooks/README.md` and `port/blocks/hook-commands.md` said the command is not shipped | every hook JSON carries the marker, so the shape cannot be mistaken for a working command by a reader who copied it |
+| `AGENTIC-SYSTEM.md` cited `agent/WIRING.md`, "still readable from `54ba837`" - neither that file nor that commit exists in this repository | the pointer is gone and its one claim kept |
+| `port/hooks/README.md` pointed at `../copilot/hooks/`, a folder this repo does not ship | it points at `copilot-vscode-hooks.json`, which exists |
+| `GATES.md` quoted a register line as `1 finding (13 folders, 13 rows)` and a pointers line as `88 tokens in 9 files` | both match what the tool prints: `13 folders, 13 rows`, and `88 cited paths in 9 files` |
 
 ### The guard, made mechanical
 
@@ -94,10 +121,10 @@ Closed unmerged, branch deleted; `main`'s head check-run was `context: success` 
 citation in the 32 Markdown files resolved against the tree each one addresses: **142 resolved, 15 not.**
 Fourteen of the fifteen are host destinations or illustrative host trees and are correct as written. The
 one defect was a provenance pointer: `AGENTIC-SYSTEM.md` cited `agent/WIRING.md`, "still readable from
-`54ba837`", and neither that file nor that commit exists in this repository - the pointer is gone and its
-one claim kept. Two more mechanical findings came from the same pass: `port/hooks/README.md` pointed at
-`../copilot/hooks/`, a folder this repo does not ship, and `GATES.md` quoted a register line as `1 finding
-(13 folders, 13 rows)` and a pointers line as `88 tokens in 9 files`, neither of which the tool prints.
+`54ba837`", and neither that file nor that commit exists in this repository. The other three rows came from
+the same pass - a hook shape whose command was unmarked, a path to a folder that is not shipped, and two
+`GATES.md` quotes, `1 finding (13 folders, 13 rows)` and `88 tokens in 9 files`, that the tool does not
+print. A quotation written from memory of output is the same defect as a path written from memory of a tree.
 
 ## 1.0.1 - the first patch
 
