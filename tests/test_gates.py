@@ -543,5 +543,40 @@ class Cli(Base):
         self.assertIn("2 of 9 gates ran", out)
 
 
+class BriefStub(Base):
+    """`brief` is the command a session-start hook calls, so it must not fail the session.
+
+    It has no renderer behind it. A missing subcommand exits 2 with an argparse error, which a hook
+    reports as a broken session; a stub that says what it is does not.
+    """
+
+    def files(self) -> list[str]:
+        return sorted(path.relative_to(self.tree.root).as_posix()
+                      for path in self.tree.root.rglob("*") if path.is_file())
+
+    def test_brief_exits_zero_and_says_it_is_not_implemented(self) -> None:
+        code, out = self.tree.run("brief")
+        self.assertEqual(code, 0, out)
+        self.assertIn("not implemented yet", out)
+        self.assertIn("no digest was written", out)
+
+    def test_brief_writes_nothing(self) -> None:
+        before = self.files()
+        self.tree.run("brief")
+        self.assertEqual(before, self.files(), "brief changed the tree")
+
+    def test_brief_accepts_check_without_writing(self) -> None:
+        before = self.files()
+        code, out = self.tree.run("brief", "--check")
+        self.assertEqual(code, 0, out)
+        self.assertIn("not implemented yet", out)
+        self.assertEqual(before, self.files(), "brief --check changed the tree")
+
+    def test_an_unknown_command_still_exits_two(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            self.tree.run("briefing")
+        self.assertEqual(raised.exception.code, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

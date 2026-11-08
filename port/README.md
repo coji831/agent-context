@@ -35,7 +35,7 @@ Each block opens with `<!-- block: <name> -->` and `<!-- authority: <path> -->`.
 
 ## The test
 
-| Question | If yes → |
+| Question | If yes -> |
 | --- | --- |
 | Is the harness **run** by the host? | `skeleton/` as a shell - if not, do not copy it at all |
 | Does it need a **choice** at install? | `port/` - the skeleton cannot decide for the host |

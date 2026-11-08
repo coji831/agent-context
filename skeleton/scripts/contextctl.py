@@ -668,10 +668,22 @@ def select(cfg: dict, args) -> tuple[list[str], list[str]]:
     return [name for name in chosen if name not in disabled], disabled
 
 
+def command_brief() -> int:
+    """`brief` is a stub: the shape a hook needs, with no renderer behind it."""
+    print("brief: not implemented yet - this release ships the gates only, so no digest was written "
+          "and none was compared.", file=sys.stderr)
+    print("The command exists so a session-start hook has something real to call; until a renderer "
+          "exists the register is the copy.", file=sys.stderr)
+    print("Exit 0 is deliberate: a hook that failed here would block the session it is starting. "
+          "`--check` is accepted and changes nothing.", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="contextctl",
                                      description="Run the gates in GATES.md over an agent-context tree.")
-    parser.add_argument("command", nargs="?", default="check", choices=["check"])
+    parser.add_argument("command", nargs="?", default="check", choices=["check", "brief"],
+                        help="check (default) runs the gates; brief is a stub that writes nothing")
     parser.add_argument("--all", action="store_true", help="run the opt-in gates too")
     parser.add_argument("--only", action="append", metavar="GATE", help="run only this gate (repeatable)")
     parser.add_argument("--skip", action="append", metavar="GATE", help="leave this gate out (repeatable)")
@@ -679,7 +691,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", default=None, help="tree root (default: current directory)")
     parser.add_argument("--config", default=None, help="path to context.config.json")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--check", action="store_true",
+                        help="with brief: compare instead of writing (accepted; brief is a stub)")
     args = parser.parse_args(argv)
+
+    if args.command == "brief":
+        return command_brief()
 
     root = Path(args.root).resolve() if args.root else Path.cwd().resolve()
     try:

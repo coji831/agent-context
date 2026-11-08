@@ -5,9 +5,10 @@
 > harness, so the *shared* part is the intent and the scripts, and the *per-harness* part is the wiring -
 > `copilot-vscode-hooks.json` in this folder for a Copilot-shaped host, and nothing else here assumes one.
 >
-> **Every command below calls `scripts/contextctl.py`, which ships its `check` commands and not `brief`.**
-> Read the ones it cannot run as the intended shape; a hook that runs a missing command fails loudly, which
-> is correct and not a bug to silence with a `|| true`.
+> **Every command below calls `scripts/contextctl.py`. `check` runs the gates; `brief` is a stub.**
+> A stub is the honest shape: it prints that no renderer exists and exits `0`, so a hook wired from these
+> examples runs rather than dying on an unknown subcommand. Read the digest row as the intent it names, not
+> as a renderer you have.
 
 ## The portable part is the intent, not the event
 
