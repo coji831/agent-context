@@ -501,6 +501,46 @@ class ShippedWorkflows(unittest.TestCase):
                          f"only {checked} of {len(self.WORKFLOWS)} shipped workflows were read")
 
 
+class LeafPattern(Base):
+    """Leaf naming is a config value: a host that numbers its notes `01-name.md` had no leaves at all.
+
+    Measured on the real host: `L-####-*.md` = 0, `NN-*.md` = 87, and `verified` printed
+    `ok 11 dated topics, 0 leaves without history` - a green gate over an empty set.
+    """
+
+    def numbered(self) -> None:
+        (self.tree.root / "context/topics/widget/L-0001-widget.md").unlink()
+        self.tree.write("context/topics/widget/01-scheduler.md",
+                        "---\nid: 01-scheduler\nbrief: what the batch size measured\n---\n")
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n| Leaf | What it answers |\n"
+                        "| --- | --- |\n| `01-scheduler.md` | what the batch size measured |\n")
+        self.tree.git()
+
+    def test_the_default_pattern_is_unchanged(self) -> None:
+        self.assert_passes("check", "--all")
+
+    def test_a_configured_pattern_finds_the_hosts_leaves(self) -> None:
+        self.numbered()
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^\\d{2}-"})
+        code, out = self.tree.run("check", "--only", "leaf-index", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 topics, 1 leaves", out)
+
+    def test_nothing_matching_the_pattern_is_reported(self) -> None:
+        self.numbered()
+        code, out = self.tree.run("check", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertIn('leaf_pattern "^L-\\d{4}" matches none of', out)
+        self.assertIn("the leaf gates checked nothing", out)
+
+    def test_a_broken_pattern_is_a_config_error(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "("})
+        code, out = self.tree.run("check", "--only", "verified")
+        self.assertEqual(code, 2, out)
+        self.assertIn("not a valid regular expression", out)
+
+
 class Verified(Base):
     def test_stale_date(self) -> None:
         readme = self.tree.read("context/topics/widget/README.md").replace(TODAY, "2020-01-01")

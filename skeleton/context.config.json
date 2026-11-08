@@ -28,5 +28,6 @@
     "MUST-KNOW.md": {"max_rules": 10, "max_rule_chars": 640}
   },
   "leaves": {"max_lines": 120},
+  "leaf_pattern": "^L-\\d{4}",
   "briefs": {"threshold": 0.82}
 }

@@ -125,13 +125,24 @@ zero files has silently passed. Three obligations, and they bind the tool:
    the path from `shells`, or lists the gate in `checks_disabled`, and the summary echoes `disabled: ported`
    so a silenced gate is never invisible. `--warn` prints the same findings and exits 0; it does not turn a
    zero into a pass.
+4. **A leaf pattern that matches no file is reported, not green.** `leaf_pattern` is the one place leaf
+   naming lives, `^L-\d{4}` by default. A `topics_dir` that holds files and none of them a leaf prints
+   `leaf_pattern "^L-\d{4}" matches none of 115 files under context/topics; the leaf gates checked nothing`,
+   once per run, from the first leaf gate the run selected - the count is in the message, and the message
+   says what it measured. It is **advisory**: a tree drained to its last leaf is legitimately leaf-free, so
+   a blocking finding would fail a correct drain and teach an operator to switch the gate off. A pattern
+   that does not compile exits **2** before any gate runs, like any other config error.
 
 ## The config surface
 
 Keys the gate set requires, and nothing else. Paths: `memory`, `root_rules`, `index_of_topics`,
 `topics_dir`, `entry_file`, `shells`, and `port_target` (the one shell holding the body; the rest are
 pointers). Budgets: `artefacts` and `root_artefacts` entries carrying `max_lines`, `max_rules`,
-`max_rule_chars` and `requires`; plus `leaves.max_lines` and `briefs.threshold`. Fan-out is **not** a key:
+`max_rule_chars` and `requires`; plus `leaves.max_lines` and `briefs.threshold`. **Leaf naming:**
+`leaf_pattern` (default `"^L-\\d{4}"`), the regular expression, matched against a file name under
+`topics_dir`, that decides what a leaf is - a host whose notes are `01-scheduler.md` sets `"^\\d{2}-"` and
+its leaves stop being invisible. It must match leaf files only: whatever it matches is read for an `id` and
+a `brief`. Fan-out is **not** a key:
 it is the contract's constant (10). Gates: `checks_disabled` (default `[]`), `checks_advisory` (default `[]`;
 a name here prints, never blocks), `extra_checks` (default `[]`; a host's assertion, same output shape).
 `accepted_absent` (default `[]`) is `pointers`'s list of citations a clone cannot resolve: an entry is a

@@ -31,7 +31,7 @@ from pathlib import Path
 FAN_OUT = 10
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 VERIFIED_RE = re.compile(r"(?m)^\s*Verified:\s*(\d{4}-\d{2}-\d{2})")
-LEAF_FILE = re.compile(r"^(L-\d{4})-")
+LEAF_PATTERN = r"^L-\d{4}"
 DECISION_RE = re.compile(r"^D-\d{4}$")
 RULE_START = re.compile(r"^(?:[-*+]|\d+\.)\s+\S")
 BACKTICK = re.compile(r"`([^`\n]+)`")
@@ -54,6 +54,7 @@ DEFAULTS = {
     "checks_advisory": [],
     "extra_checks": [],
     "leaves": {"max_lines": 120},
+    "leaf_pattern": LEAF_PATTERN,
     "briefs": {"threshold": 0.82},
     "artefacts": {
         "README.md": {"max_lines": 80,
@@ -95,11 +96,17 @@ def known_names() -> list[str]:
 def load_config(root: Path, explicit: str | None) -> tuple[dict, list[str]]:
     """Return the merged config and any complaint about a name it mentions."""
     path = Path(explicit) if explicit else root / "context.config.json"
-    raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    # utf-8-sig, not utf-8: Windows PowerShell 5.1's `Set-Content -Encoding utf8` writes a BOM, and a
+    # config that cannot be read is an install that cannot be proven.
+    raw = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
     cfg = merge(DEFAULTS, raw)
     for key in ("artefacts", "root_artefacts"):
         cfg[key] = {name: spec for name, spec in cfg[key].items() if spec is not None}
     problems = []
+    try:
+        re.compile(str(cfg["leaf_pattern"]))
+    except re.error as error:
+        problems.append(f'leaf_pattern "{cfg["leaf_pattern"]}" is not a valid regular expression: {error}')
     known = set(known_names())
     for key in ("checks_disabled", "checks_advisory", "extra_checks"):
         for name in cfg.get(key) or []:
@@ -117,6 +124,7 @@ class Finding:
     path: str
     line: int | None
     message: str
+    advisory: bool = False
 
     def render(self) -> str:
         where = self.path if self.line is None else f"{self.path}:{self.line}"
@@ -299,6 +307,9 @@ class Ctx:
         self.cfg = cfg
         self.tree_root = (root / cfg["memory"]).parent
         self.topics_dir = root / cfg["topics_dir"]
+        # Compiled once, in one place: every gate that asks "is this a leaf" asks this pattern.
+        self.leaf_file = re.compile(str(cfg["leaf_pattern"]))
+        self._leaf_warned = False
         self.topics = self._topics()
         self.leaves = self._leaves()
 
@@ -315,13 +326,32 @@ class Ctx:
 
     def _leaves(self) -> list[Leaf]:
         leaves = []
-        for path in sorted(self.topics_dir.rglob("L-*.md")):
-            if not LEAF_FILE.match(path.name):
+        for path in sorted(self.topics_dir.rglob("*.md")):
+            if not self.leaf_file.match(path.name):
                 continue
             text = self.read(path) or ""
             ident, brief = parse_leaf(text)
             leaves.append(Leaf(path, self.rel(path), ident, brief, text.splitlines()))
         return leaves
+
+    def leaf_warning(self) -> Finding | None:
+        """The liveness finding, reported once per run by the first leaf gate that asks.
+
+        A tree of numbered notes under the default `^L-\\d{4}` has no leaves at all, and the leaf gates
+        then measure nothing while printing `ok`. Advisory, not blocking: a fully drained tree is
+        legitimately leaf-free, and failing a correct drain teaches an operator to switch a gate off.
+        """
+        if self._leaf_warned:
+            return None
+        self._leaf_warned = True
+        if not self.topics_dir.is_dir() or self.leaves:
+            return None
+        files = [path for path in self.topics_dir.rglob("*") if path.is_file()]
+        if not files:
+            return None
+        return Finding("", self.rel(self.topics_dir), None,
+                       f'leaf_pattern "{self.cfg["leaf_pattern"]}" matches none of {len(files)} files '
+                       f'under {self.rel(self.topics_dir)}; the leaf gates checked nothing', advisory=True)
 
     def rel(self, path: Path) -> str:
         try:
@@ -446,13 +476,16 @@ def gate_leaf_index(ctx: Ctx) -> Result:
                 if leaf.path.parent == index.parent and leaf.path.name not in listed:
                     findings.append(Finding(gate, leaf.rel, None, f"no row in {ctx.rel(index)}"))
         for family in sorted(p for p in topic.dir.iterdir() if p.is_dir()):
-            owned = [p for p in family.glob("L-*.md") if LEAF_FILE.match(p.name)]
+            owned = [p for p in family.glob("*.md") if ctx.leaf_file.match(p.name)]
             if owned and not (family / "README.md").exists():
                 for leaf in owned:
                     findings.append(Finding(gate, ctx.rel(leaf), None,
                                             f"leaf sits in {ctx.rel(family)}/, which has no README.md"))
     if scanned == 0:
         return zero(gate, ctx.rel(ctx.topics_dir), "topic READMEs", ctx.topics_dir.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, scanned, f"{len(ctx.topics)} topics, {len(ctx.leaves)} leaves")
 
 
@@ -462,13 +495,13 @@ def gate_shape(ctx: Ctx) -> Result:
     examined = 0
     for leaf in ctx.leaves:
         examined += 1
-        match = LEAF_FILE.match(leaf.path.name)
+        match = ctx.leaf_file.match(leaf.path.name)
         if not leaf.id:
             findings.append(Finding(gate, leaf.rel, 1,
                                     "no `id: L-####` in the frontmatter or the first two lines"))
-        elif match and leaf.id != match.group(1):
+        elif match and leaf.id != match.group(0) and leaf.id != leaf.path.stem:
             findings.append(Finding(gate, leaf.rel, 1,
-                                    f"id {leaf.id} does not match the file name ({match.group(1)})"))
+                                    f"id {leaf.id} does not match the file name ({match.group(0)})"))
         if not leaf.brief:
             findings.append(Finding(gate, leaf.rel, 2,
                                     "no `brief:`; the index cannot say what this leaf answers"))
@@ -522,6 +555,9 @@ def gate_shape(ctx: Ctx) -> Result:
                                         f'row has no date ({when or "empty"}); expected YYYY-MM-DD'))
     if examined == 0:
         return zero(gate, ctx.rel(ctx.tree_root), "files", ctx.tree_root.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, examined, f"{examined} files")
 
 
@@ -572,6 +608,9 @@ def gate_caps(ctx: Ctx) -> Result:
         check(ctx.tree_root / name, spec)
     if examined == 0:
         return zero(gate, ctx.rel(ctx.tree_root), "artefacts", ctx.tree_root.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, examined, f"{examined} artefacts")
 
 
@@ -604,6 +643,9 @@ def gate_briefs(ctx: Ctx) -> Result:
                                         f"{first.id or first.path.stem}; one conclusion, two leaves?"))
     if not ctx.topics:
         return zero(gate, ctx.rel(ctx.topics_dir), "topics", ctx.topics_dir.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, len(ctx.topics), f"{briefs} briefs in {len(ctx.topics)} topics")
 
 
@@ -646,6 +688,9 @@ def gate_verified(ctx: Ctx) -> Result:
     if findings == [] and undated and undated == len(ctx.leaves):
         findings.append(Finding(gate, ctx.rel(ctx.tree_root), None,
                                 f"git history unavailable for all {undated} leaves, so no date was checked"))
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, scanned, f"{scanned} dated topics, {undated} leaves without history")
 
 
@@ -861,23 +906,24 @@ def main(argv: list[str] | None = None) -> int:
     advisory_findings = 0
     for name in chosen:
         result = GATES[name](ctx) if name in GATES else gate_installed(ctx)
-        result.advisory = bool(args.warn) or name in advisory
-        if result.findings:
-            if result.advisory:
-                advisory_findings += len(result.findings)
-            else:
-                blocking += len(result.findings)
+        forced = bool(args.warn) or name in advisory
+        blocking_findings = [] if forced else [f for f in result.findings if not f.advisory]
+        result.advisory = forced or (bool(result.findings) and not blocking_findings)
+        blocking += len(blocking_findings)
+        advisory_findings += len(result.findings) - len(blocking_findings)
         results.append(result)
 
     if args.json:
         payload = {
             "root": root.as_posix(),
             "gates": [{"gate": result.gate,
-                       "status": "ok" if not result.findings else "fail",
+                       "status": ("ok" if not result.findings
+                                  else ("warn" if result.advisory else "fail")),
                        "advisory": result.advisory,
                        "subjects": result.count,
                        "detail": result.detail,
-                       "findings": [{"path": f.path, "line": f.line, "message": f.message}
+                       "findings": [{"path": f.path, "line": f.line, "message": f.message,
+                                     "advisory": f.advisory}
                                     for f in result.findings]}
                       for result in results],
             "blocking": blocking,
