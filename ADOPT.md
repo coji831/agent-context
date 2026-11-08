@@ -96,7 +96,8 @@ entry file fails with `entry file not found` until you change it.
   duplicates the block.
 
 Then run the upsert twice and `git diff`: the second run must be a no-op. A second block is the failure the
-markers exist to prevent.
+markers exist to prevent - and `installed` counts them, so a duplicate or an empty block fails the gate in
+1.0.7 and later rather than waiting for the diff to be read.
 
 ## Step 6 - copy the shells, then fill every marker
 

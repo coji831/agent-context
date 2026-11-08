@@ -577,6 +577,32 @@ class Installed(Base):
         self.tree.write("AGENTS.md", "# AGENTS.md\n\nno block here\n")
         self.assert_fails_with("no <!-- context:begin -->", "check")
 
+    def test_second_entry_block(self) -> None:
+        entry = self.tree.read("AGENTS.md")
+        self.tree.write("AGENTS.md", entry + "\n" + entry)
+        out = self.assert_fails_with("2 begin and 2 end markers", "check")
+        self.assertIn("delete it", out)
+
+    def test_markers_are_counted_not_merely_present(self) -> None:
+        entry = self.tree.read("AGENTS.md")
+        self.tree.write("AGENTS.md", entry + "\n<!-- context:begin -->\nanother block\n")
+        self.assert_fails_with("2 begin and 1 end markers", "check")
+
+    def test_empty_entry_block(self) -> None:
+        self.tree.write("AGENTS.md",
+                        "# AGENTS.md\n\n<!-- context:begin -->\n   \n<!-- context:end -->\n")
+        self.assert_fails_with("the entry block is empty", "check")
+
+    def test_end_marker_before_begin(self) -> None:
+        self.tree.write("AGENTS.md",
+                        "# AGENTS.md\n\n<!-- context:end -->\nx\n<!-- context:begin -->\n")
+        self.assert_fails_with("comes before", "check")
+
+    def test_missing_shell_is_not_counted_as_filled(self) -> None:
+        (self.tree.root / ".claude/rules/context.md").unlink()
+        out = self.assert_fails_with("named in shells, absent", "check", "--only", "installed")
+        self.assertIn("0 of 1 shells filled", out)
+
     def test_nothing_to_check(self) -> None:
         self.tree.config({})
         (self.tree.root / "AGENTS.md").unlink()

@@ -36,6 +36,8 @@ DECISION_RE = re.compile(r"^D-\d{4}$")
 RULE_START = re.compile(r"^(?:[-*+]|\d+\.)\s+\S")
 BACKTICK = re.compile(r"`([^`\n]+)`")
 PORT_MARKER = re.compile(r"<!--\s*PORT:[^>]*-->")
+ENTRY_BEGIN = "<!-- context:begin -->"
+ENTRY_END = "<!-- context:end -->"
 PORTED = re.compile(r"(?m)^\s*(?:<!--\s*)?ported:\s*(\d{4}-\d{2}-\d{2})")
 POINTER = re.compile(r"The rules for this tree are in\s+`([^`]+)`")
 HEADING = re.compile(r"^##\s+(.*?)\s*$")
@@ -896,6 +898,7 @@ def gate_installed(ctx: Ctx) -> Result:
     gate = "installed"
     findings = []
     shells = [ctx.root / name for name in ctx.cfg["shells"]]
+    filled = 0
     for shell in shells:
         text = ctx.read(shell)
         if text is None:
@@ -906,22 +909,43 @@ def gate_installed(ctx: Ctx) -> Result:
             number = text[:marker.start()].count("\n") + 1
             findings.append(Finding(gate, ctx.rel(shell), number,
                                     f'still contains "{marker.group(0)}"; the routing table never reached the agent'))
+        else:
+            filled += 1
         pointer = POINTER.search(text)
         if pointer and not resolves(ctx, shell, pointer.group(1)):
             findings.append(Finding(gate, ctx.rel(shell), None,
                                     f'pointer names "{pointer.group(1)}", which does not resolve'))
     entry = ctx.root / ctx.cfg["entry_file"]
     text = ctx.read(entry)
+    present = False
     if text is None:
         findings.append(Finding(gate, ctx.rel(entry), None, "entry file not found"))
-    elif "<!-- context:begin -->" not in text or "<!-- context:end -->" not in text:
-        findings.append(Finding(gate, ctx.rel(entry), None,
-                                "no <!-- context:begin --> ... <!-- context:end --> block"))
+    else:
+        where = ctx.rel(entry)
+        begins = [m.start() for m in re.finditer(re.escape(ENTRY_BEGIN), text)]
+        ends = [m.start() for m in re.finditer(re.escape(ENTRY_END), text)]
+        if not begins or not ends:
+            findings.append(Finding(gate, where, None,
+                                    f"no {ENTRY_BEGIN} ... {ENTRY_END} block"))
+        elif len(begins) > 1 or len(ends) > 1:
+            # The upsert's own failure: step 5 says a second block is what the markers exist to prevent,
+            # and the block is appended, so the copy it hides is never read again.
+            second = sorted(begins)[1] if len(begins) > 1 else sorted(ends)[1]
+            findings.append(Finding(gate, where, text[:second].count("\n") + 1,
+                                    f"{len(begins)} begin and {len(ends)} end markers; exactly one block per "
+                                    "repo, so a second block is an upsert that ran twice - delete it"))
+        elif ends[0] < begins[0]:
+            findings.append(Finding(gate, where, text[:ends[0]].count("\n") + 1,
+                                    f"{ENTRY_END} comes before {ENTRY_BEGIN}; no block reaches the agent"))
+        elif not text[begins[0] + len(ENTRY_BEGIN):ends[0]].strip():
+            findings.append(Finding(gate, where, text[:begins[0]].count("\n") + 1,
+                                    "the entry block is empty; the routing table never reached the agent"))
+        else:
+            present = True
     if not shells and text is None:
         return zero(gate, ctx.rel(ctx.root), "shells and entry file", entry.exists())
-    present = bool(text) and "<!-- context:begin -->" in text
     return Result(gate, findings, len(shells) + 1,
-                  f"{len(shells)} shells filled, entry block {'present' if present else 'missing'}")
+                  f"{filled} of {len(shells)} shells filled, entry block {'present' if present else 'missing'}")
 
 
 CHECKS = [
