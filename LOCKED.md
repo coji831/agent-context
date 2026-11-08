@@ -51,6 +51,28 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.6 - the dates a clone invented, and the CI nobody asked for
+
+**1.0.6, 2026-11-08.** Four defects, all found by porting v1.0.5 onto a real 11-topic host with real history -
+the first run where the tree met commits it did not write. One is severe enough to change the shape of a gate:
+`verified` was answering confidently from a clone that could not answer at all.
+
+| Was | Is |
+| --- | --- |
+| a **depth-1 clone** silently dated every leaf at the clone boundary. The boundary commit has no parent, so git presents it as the root commit that added all 346 files, and `git log -1 --format=%cs -- <leaf>` returned that one date for every leaf: `2026-11-08` where the true date was `2026-10-23`, with `0 leaves without history` printed. The `undated == len(leaves)` guard could not fire because nothing was undated | `gate_verified` asks `git rev-parse --is-shallow-repository` **before** comparing any date (falling back to `<gitdir>/shallow` for git < 2.15) and emits **one** blocking finding for the whole run: no per-leaf comparison, no claim about leaves without history, the remedy named (`fetch-depth: 0` on checkout, or `git fetch --unshallow`), and `checks_advisory` as the opt-out for a host that cannot provide history |
+| a table cell written as a markdown link was read as a file name: 10 findings of ``row names "[`01-clusters.md`](./01-clusters.md)", no such file`` | `cell_name()` resolves a link cell to its **target**, stripped of any `./` prefix, wherever a leaf name is read from a row (`leaf-index`, a family index, and the `briefs` row lookup). A bare backticked cell reads exactly as before, and a link to a missing file is still one finding, naming the target |
+| `shape` told a host numbering its notes `NN-name.md` to add `id: L-####`. `leaf_pattern` was honoured by the file matcher and not by the message | the message names the `leaf_pattern` **in force**, the value it matched, and the file stem - the two legal forms - and is unchanged for the default `^L-\d{4}` |
+| the example workflow read as an expected part of an install | `port/hooks/ci.yml` is **OPTIONAL, AND NOT PART OF AN INSTALL**, in those words: an install adds no workflow, changes no CI config and requires no status check; a host already running CI must not have it added alongside or merged into it. `ADOPT.md` step 7 states the same, and the failure mode is named: a host that adapts the workflow without `fetch-depth: 0` gets a **loud** shallow finding rather than invented dates. That is why depth is not optional for the workflow while the workflow itself is |
+
+**The 1.0.2 claim was wrong and this is its first observation.** 1.0.2, `GATES.md` and both shipped workflows
+said a depth-1 clone made the date gate "find no commit date on any leaf" and therefore report unavailable
+history. Measured above: it found a date for every leaf, and the date was wrong. The mechanism had been read
+from the source and never run. Both the `1.0.2` table row and its section now say so.
+
+**Tests: 84 before, 98 after.** Fourteen new, each red before its fix: five for the shallow clone (including
+one that asserts the premise - the boundary date differs from the true date - and one that a full clone prints
+a byte-identical run), four for link cells, four for the id message, one for the workflow's optionality.
+
 ## 1.0.5 - the id that was read as a file name
 
 **1.0.5, 2026-11-08.** One defect, reproduced against v1.0.4 on a tree whose leaf pattern is `^NN-\d{2}` and
