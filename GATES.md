@@ -22,7 +22,7 @@ to a human when they matter. *Cadence* says where a gate *belongs*, so a host wi
 | default | `caps` | both | Every count is inside its configured cap: `HANDOFF.md` lines, `MUST-KNOW.md` rules and rule characters, `MEMORY.md` lines, leaf lines, topic `README.md` lines, and fan-out (more than 10 rows needs a family index). | A handoff grown to a thousand lines with the real next step at its end; a topic README listing thirty leaves flat. | `FAIL caps context/topics/widget/HANDOFF.md: 214 lines, max 90; move the history to JOURNEY.md and rewrite the snapshot` | milestone | gate | should |
 | opt-in | `briefs` | both | No two leaves in **one topic** have `brief` lines above **0.82** similarity - calibrated 2026-11-08: 29 hard negatives (same topic, different conclusions) max at 0.649, so 0.82 leaves a 0.17 margin and fires on 0 of them. | Two leaves holding one conclusion, the second written instead of the first rewritten - **near-verbatim only**: a copy with a word changed scores above 0.9, a rephrasing scores 0.4-0.6 and is deliberately missed. | `FAIL briefs context/topics/widget/README.md:11: brief of L-0003 is 0.86 similar to L-0001` | CI | gate | could |
 | opt-in | `verified` | both | A topic `README.md`'s `Verified:` date is not older than the newest **git commit date** among the leaves it indexes (`git log -1 --format=%cs`), never a filesystem mtime. | A topic re-read and one leaf rewritten, while the entry still shows last month's date. | `FAIL verified context/topics/widget/README.md:3: Verified: 2026-09-01, 41 days behind L-0002` | CI (2.7 s at 80 leaves, 17.5 s at 500 - one git spawn each, measured 2026-11-08) | gate | could |
-| opt-in | `pointers` | both | Every backticked path in `MEMORY.md`, the root rules, the entry block and a topic `README.md` resolves from the tree root. | A citation to a file that moved, so a reader follows a dead pointer and trusts nothing after it. | `FAIL pointers context/MEMORY.md:12: "docs/runbook.md" does not resolve` | milestone | gate | should |
+| opt-in | `pointers` | both | Every backticked path in `MEMORY.md`, the root rules, the entry block and a topic `README.md` resolves from the tree root, unless it matches an `accepted_absent` entry or begins `~/` or `$HOME/`. | A citation to a file that moved, so a reader follows a dead pointer and trusts nothing after it. | `FAIL pointers context/MEMORY.md:12: "docs/runbook.md" does not resolve` | milestone | gate | should |
 | opt-in | `ported` | host only | Every path listed in `shells` carries a `ported: <YYYY-MM-DD>` line. | A filled rule shell with nothing dating it, so a human cannot rank it against the contract. | `FAIL ported .claude/rules/context.md:3: no "ported:" line` | milestone | gate | once |
 
 **A host that changes nothing gets the four default gates**, blocking, when it runs `contextctl check` at a
@@ -134,6 +134,14 @@ pointers). Budgets: `artefacts` and `root_artefacts` entries carrying `max_lines
 `max_rule_chars` and `requires`; plus `leaves.max_lines` and `briefs.threshold`. Fan-out is **not** a key:
 it is the contract's constant (10). Gates: `checks_disabled` (default `[]`), `checks_advisory` (default `[]`;
 a name here prints, never blocks), `extra_checks` (default `[]`; a host's assertion, same output shape).
+`accepted_absent` (default `[]`) is `pointers`'s list of citations a clone cannot resolve: an entry is a
+path, a path prefix or a glob, a citation matching one is **accepted, not reported**, and the gate's own
+line prints how many it accepted - `ok pointers 108 cited paths in 14 files, 22 accepted absent` - so a
+check that covers less than it claims says so out loud. An entry that matches no citation is itself a
+finding (`FAIL pointers context.config.json: accepted_absent entry "repos/" matched no citation`), so the
+list cannot rot into a list nobody read. **A citation beginning `~/` or `$HOME/` is always accepted, and
+counted in the same number, with no config**: a memory tree may legitimately cite a user-level file, and
+no tree root can resolve one.
 
 **A config that names a gate which does not exist fails loudly.** Any unknown name, in `checks_disabled`,
 `checks_advisory`, `extra_checks`, `--only` or `--skip`, exits **2** and lists every known name, the eight

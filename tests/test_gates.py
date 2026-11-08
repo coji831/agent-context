@@ -357,6 +357,50 @@ class Pointers(Base):
         self.assert_passes("check", "--all")
 
 
+class AcceptedAbsent(Base):
+    """A gitignored directory and a home-relative path are permanent false findings without a list.
+
+    The host this was measured on carries `repos/` and `state/` for real, `/`-anchored in `.gitignore`
+    and so absent from every clone, plus two `~/` citations; the retired checker it replaced accepted
+    32 entries and its summary printed how many it had accepted.
+    """
+
+    def cite(self, token: str) -> None:
+        self.tree.append("context/MEMORY.md", "\n- see `" + token + "` for it\n")
+
+    def configured(self, entries: list[str]) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "accepted_absent": entries})
+
+    def test_a_prefix_entry_accepts_and_is_counted(self) -> None:
+        self.configured(["repos/"])
+        self.cite("repos/pvl-rentals/README.md")
+        code, out = self.tree.run("check", "--only", "pointers")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 accepted absent", out)
+
+    def test_a_glob_entry_accepts(self) -> None:
+        self.configured(["reports/qa-*.md"])
+        self.cite("reports/qa-2026-11.md")
+        self.assert_passes("check", "--only", "pointers")
+
+    def test_a_home_relative_path_needs_no_config(self) -> None:
+        self.cite("~/.copilot/instructions/terminal-command-safety.instructions.md")
+        self.cite("$HOME/.copilot/agents/reviewer.md")
+        code, out = self.tree.run("check", "--only", "pointers")
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 accepted absent", out)
+
+    def test_a_citation_outside_the_list_still_fails(self) -> None:
+        self.configured(["repos/"])
+        self.cite("docs/runbook.md")
+        self.assert_fails_with('"docs/runbook.md" does not resolve', "check", "--only", "pointers")
+
+    def test_an_entry_that_matches_nothing_is_a_finding(self) -> None:
+        self.configured(["repos/"])
+        self.assert_fails_with('accepted_absent entry "repos/" matched no citation',
+                               "check", "--only", "pointers")
+
+
 class Installed(Base):
     def test_port_marker_survives(self) -> None:
         self.tree.append(".claude/rules/context.md", "\n<!-- PORT: context-rules -->\n")

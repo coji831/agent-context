@@ -16,6 +16,9 @@ Exit codes: 0 no blocking finding, 1 blocking findings, 2 usage or config error.
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import importlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -46,6 +49,7 @@ DEFAULTS = {
     "entry_file": "AGENTS.md",
     "shells": [],
     "port_target": None,
+    "accepted_absent": [],
     "checks_disabled": [],
     "checks_advisory": [],
     "extra_checks": [],
@@ -663,10 +667,21 @@ def resolves(ctx: Ctx, source: Path, token: str) -> bool:
     return any((base / token).exists() for base in bases)
 
 
+def accepts_absent(entry: str, token: str) -> bool:
+    """A citation matches an `accepted_absent` entry as an exact path, a prefix, or a glob."""
+    prefix = entry.rstrip("/")
+    if token in (entry, prefix) or token.startswith(prefix + "/"):
+        return True
+    return fnmatch.fnmatchcase(token, entry)
+
+
 def gate_pointers(ctx: Ctx) -> Result:
     gate = "pointers"
     findings = []
     tokens = 0
+    accepted = 0
+    entries = [str(entry) for entry in ctx.cfg.get("accepted_absent") or []]
+    used: set[str] = set()
     files = [ctx.root / ctx.cfg["memory"], ctx.root / ctx.cfg["root_rules"],
              ctx.root / ctx.cfg["entry_file"]] + [topic.readme for topic in ctx.topics]
     for path in files:
@@ -678,11 +693,27 @@ def gate_pointers(ctx: Ctx) -> Result:
                 if not path_like(token):
                     continue
                 tokens += 1
+                clean = token.strip().strip("`").split("#")[0]
+                if clean.startswith(("~/", "$HOME/")):
+                    accepted += 1
+                    continue
+                hit = next((entry for entry in entries if accepts_absent(entry, clean)), None)
+                if hit is not None:
+                    used.add(hit)
+                    accepted += 1
+                    continue
                 if not resolves(ctx, path, token):
                     findings.append(Finding(gate, ctx.rel(path), number, f'"{token}" does not resolve'))
+    for entry in entries:
+        if entry not in used:
+            findings.append(Finding(gate, "context.config.json", None,
+                                    f'accepted_absent entry "{entry}" matched no citation'))
     if tokens == 0:
         return zero(gate, ctx.rel(ctx.tree_root), "cited paths", ctx.tree_root.is_dir())
-    return Result(gate, findings, tokens, f"{tokens} cited paths in {len(files)} files")
+    detail = f"{tokens} cited paths in {len(files)} files"
+    if accepted:
+        detail += f", {accepted} accepted absent"
+    return Result(gate, findings, tokens, detail)
 
 
 def gate_ported(ctx: Ctx) -> Result:
