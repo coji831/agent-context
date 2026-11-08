@@ -10,6 +10,7 @@ import contextlib
 import hashlib
 import io
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -327,6 +328,74 @@ class Ported(Base):
         code, out = self.tree.run("check", "--only", "ported")
         self.assertEqual(code, 0, out)
         self.assertIn("0 shells configured", out)
+
+
+class ShippedWorkflows(unittest.TestCase):
+    """The workflows a host copies must be able to gate the merge they are copied to guard.
+
+    Two lines are load-bearing and neither is visible in a review of a green run. A check-run is named by
+    the job, so a job whose `name:` differs from the workflow's reports a check no branch protection
+    requires - the pull request stays blocked forever. And the date gate reads each leaf's last commit,
+    which a depth-1 clone cannot answer, so it reports the history as unavailable on every push. Both were
+    missing from the adopter template shipped in 1.0.1, which is why they are measured rather than prose.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+    WORKFLOWS = (".github/workflows/context.yml", "port/hooks/ci.yml")
+
+    def read(self, name: str) -> str:
+        path = self.ROOT / name
+        self.assertTrue(path.is_file(), f"{name} is missing from the release")
+        return path.read_text(encoding="utf-8")
+
+    def job(self, name: str, text: str) -> tuple[str | None, str | None]:
+        """(job id, its display name) for the single job under the top-level `jobs:` key."""
+        lines = text.splitlines()
+        starts = [i for i, line in enumerate(lines) if line.rstrip() == "jobs:"]
+        self.assertEqual(len(starts), 1, f"{name}: expected exactly one top-level jobs: key")
+        job_id = job_name = None
+        for line in lines[starts[0] + 1:]:
+            if not line.strip():
+                continue
+            if not line.startswith(" "):
+                break
+            indent = len(line) - len(line.lstrip())
+            key, _, value = line.strip().partition(":")
+            if indent == 2:
+                job_id, job_name = key, None
+            elif indent == 4 and key == "name":
+                job_name = value.strip()
+        return job_id, job_name
+
+    def test_the_job_name_is_the_check_run_name(self) -> None:
+        checked = 0
+        for name in self.WORKFLOWS:
+            text = self.read(name)
+            workflow = re.search(r"(?m)^name:\s*(\S.*?)\s*$", text)
+            self.assertIsNotNone(workflow, f"{name} has no top-level name:")
+            job_id, job_name = self.job(name, text)
+            self.assertIsNotNone(job_id, f"{name} has no job under jobs:")
+            self.assertIsNotNone(job_name, f"{name}: job {job_id!r} has no name:, so the check-run is "
+                                           f"named after the job id and never satisfies a required "
+                                           f"status check named {workflow.group(1)!r}")
+            self.assertEqual(job_name.strip("'\""), workflow.group(1).strip("'\""),
+                             f"{name}: job {job_id!r} is named {job_name!r}, not the workflow's "
+                             f"{workflow.group(1)!r}, so the required check never reports")
+            checked += 1
+        self.assertEqual(checked, len(self.WORKFLOWS),
+                         f"only {checked} of {len(self.WORKFLOWS)} shipped workflows were read")
+
+    def test_checkout_fetches_the_full_history(self) -> None:
+        checked = 0
+        for name in self.WORKFLOWS:
+            text = self.read(name)
+            self.assertIn("actions/checkout", text, f"{name} checks nothing out")
+            self.assertRegex(text, r"(?m)^\s+fetch-depth:\s*['\"]?0\s*$",
+                             f"{name}: checkout omits fetch-depth: 0, so a depth-1 clone dates no leaf "
+                             f"and the date gate reports unavailable history on every push")
+            checked += 1
+        self.assertEqual(checked, len(self.WORKFLOWS),
+                         f"only {checked} of {len(self.WORKFLOWS)} shipped workflows were read")
 
 
 class Verified(Base):
