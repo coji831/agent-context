@@ -10,3 +10,4 @@
 | Topic | What it covers | Verified |
 | --- | --- | --- |
 | `context/topics/widget/` | example topic shipped with the skeleton - replace it with your first real one | 2026-01-01 |
+| `context/topics/pricing/` | PROOF ONLY - this folder does not exist | 2026-01-01 |
