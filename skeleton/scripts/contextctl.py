@@ -298,6 +298,24 @@ def brief_column(header: list[str] | None, leaf: int) -> int:
     return leaf + 1
 
 
+LINK_CELL = re.compile(r"^\s*\[[^\]]*\]\(\s*([^)\s]+)[^)]*\)\s*$")
+
+
+def cell_name(cell: str) -> str:
+    """The file name a table cell names: a markdown link's target, else the cell's own text.
+
+    ``[`01-clusters.md`](./01-clusters.md)`` is the ordinary way to write a link in a table, and reading
+    the whole cell as a file name reported every such row as a missing file. A cell with no link keeps
+    today's reading exactly: backticks stripped, whitespace trimmed.
+    """
+    text = cell.strip()
+    link = LINK_CELL.match(text)
+    if link:
+        text = link.group(1)
+    text = text.strip("`").strip().split("#")[0]
+    return text[2:] if text.startswith("./") else text
+
+
 def rule_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
     """Top-level list items with their indented continuation lines."""
     blocks: list[tuple[int, list[str]]] = []
@@ -502,7 +520,7 @@ def gate_leaf_index(ctx: Ctx) -> Result:
                 for number, cells in rows:
                     if len(cells) <= column:
                         continue
-                    leaf_name = cells[column].strip("`").strip()
+                    leaf_name = cell_name(cells[column])
                     listed.append(leaf_name)
                     if not (index.parent / leaf_name).exists():
                         findings.append(Finding(gate, ctx.rel(index), number,
@@ -524,6 +542,21 @@ def gate_leaf_index(ctx: Ctx) -> Result:
     return Result(gate, findings, scanned, f"{len(ctx.topics)} topics, {len(ctx.leaves)} leaves")
 
 
+def leaf_id_message(cfg: dict, leaf: Leaf, match: "re.Match[str] | None") -> str:
+    """What a leaf's id must be, stated in the terms of the `leaf_pattern` actually in force.
+
+    The rule is `id == the pattern's match` or `id == the file stem`. A hardcoded `L-####` told a host
+    numbering its notes `NN-name.md` to add an id shape its own config says it does not use.
+    """
+    pattern = str(cfg["leaf_pattern"])
+    if pattern == LEAF_PATTERN:
+        lead = "no `id: L-####` in the frontmatter or the first two lines"
+    else:
+        lead = f'no leaf id in the frontmatter or the first two lines; `leaf_pattern` is "{pattern}"'
+    matched = f"`{match.group(0)}`" if match else "the file name"
+    return f"{lead}: the id must be {matched} (what `leaf_pattern` matches) or the file stem `{leaf.path.stem}`"
+
+
 def gate_shape(ctx: Ctx) -> Result:
     gate = "shape"
     findings = []
@@ -532,8 +565,7 @@ def gate_shape(ctx: Ctx) -> Result:
         examined += 1
         match = ctx.leaf_file.match(leaf.path.name)
         if not leaf.id:
-            findings.append(Finding(gate, leaf.rel, 1,
-                                    "no `id: L-####` in the frontmatter or the first two lines"))
+            findings.append(Finding(gate, leaf.rel, 1, leaf_id_message(ctx.cfg, leaf, match)))
         elif match and leaf.id != match.group(0) and leaf.id != leaf.path.stem:
             findings.append(Finding(gate, leaf.rel, 1,
                                     f"id {leaf.id} does not match the file name ({match.group(0)})"))
@@ -667,7 +699,7 @@ def gate_briefs(ctx: Ctx) -> Result:
                 column = 1
             for number, cells in rows:
                 if len(cells) > column:
-                    row_line[cells[column].strip("`").strip()] = number
+                    row_line[cell_name(cells[column])] = number
         own = [leaf for leaf in ctx.topics_of(topic) if leaf.brief]
         briefs += len(own)
         for index, first in enumerate(own):
@@ -698,15 +730,59 @@ def git_date(root: Path, rel: str) -> str | None:
     return out if DATE_RE.match(out) else None
 
 
+def git_shallow(root: Path) -> bool:
+    """True when the clone is shallow, so no file's last-commit date can be trusted.
+
+    In a depth-1 clone the boundary commit has no parent, so git presents it as the root commit that
+    added every file and `git log -1 -- <path>` returns that one commit's date for every path. The
+    `undated == len(leaves)` guard never fires there, because nothing is undated - which is why the
+    caller must ask this question *before* comparing any date.
+    """
+    try:
+        done = subprocess.run(["git", "-C", str(root), "rev-parse", "--is-shallow-repository"],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        done = None
+    if done is not None and done.returncode == 0:
+        answer = done.stdout.strip().lower()
+        if answer in ("true", "false"):
+            return answer == "true"
+    # git older than 2.15 has no such query: the marker file is the only signal it offers.
+    try:
+        done = subprocess.run(["git", "-C", str(root), "rev-parse", "--git-dir"],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if done.returncode != 0:
+        return False
+    git_dir = Path(done.stdout.strip() or ".git")
+    if not git_dir.is_absolute():
+        git_dir = root / git_dir
+    return (git_dir / "shallow").exists()
+
+
 def gate_verified(ctx: Ctx) -> Result:
     gate = "verified"
     findings = []
-    scanned = 0
     undated = 0
-    for topic in ctx.topics:
+    dated = [topic for topic in ctx.topics if topic_verified(topic.readme)]
+    if not dated:
+        return zero(gate, ctx.rel(ctx.topics_dir), "dated topics")
+    if git_shallow(ctx.root):
+        findings.append(Finding(gate, ctx.rel(ctx.tree_root), None,
+                                "the clone is shallow, so the last-commit date git reports for a leaf "
+                                "is the clone boundary's, not the leaf's; no date was checked. "
+                                "Fetch the full history and run again (fetch-depth: 0 on checkout, or "
+                                "git fetch --unshallow); a host that cannot provide history can list "
+                                "verified in checks_advisory"))
+        stale = ctx.leaf_warning()
+        if stale is not None:
+            findings.append(stale)
+        return Result(gate, findings, len(dated),
+                      f"{len(dated)} dated topics, no date compared: shallow clone")
+    scanned = 0
+    for topic in dated:
         verified = topic_verified(topic.readme)
-        if not verified:
-            continue
         scanned += 1
         newest = None
         newest_leaf = None

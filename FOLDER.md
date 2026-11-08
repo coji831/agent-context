@@ -15,13 +15,13 @@ opened. Then `context/MUST-KNOW.md`, then the one topic the task touches, then s
 - `ADOPT.md` - the runbook an agent follows to put the tree on a host repo, fresh or add-on; when adopting, and never again.
 - `AGENTIC-SYSTEM.md` - how a harness connects at all: the authoring map (§0 - where each artefact is edited), the three connection layers in order with what each silently does without, per harness the file that must exist, the write contract, the dispute order, and one worked arrival; when the wiring is in question.
 - `MECHANISM.md` - **how the tree is used**: the five stages with the file each writes and its mutability, the operations at each turn, who may perform each one without asking (`act` / `ask` / `owner`), one worked session; on demand, when the operation or a write's authority is in question, never loaded by a session.
-- `VERSION` - `1.0.1`; read by tooling and humans, never by a session. What the first release contains, and the decisions behind it: `LOCKED.md`.
+- `VERSION` - `1.0.6`; read by tooling and humans, never by a session. What the first release contains, and the decisions behind it: `LOCKED.md`.
 - `.gitattributes` - `* text=auto eol=lf`, with `.ps1` at CRLF; read by git, never by a session. It is load-bearing rather than tidy: a CRLF `port/hooks/pre-commit.sh` fails under bash with `$'\r': command not found`, which is a hook that looks installed and cannot run.
 - `.gitignore` - `__pycache__/` and `*.py[cod]`, plus the two tool caches; read by git, never by a session. A committed `.pyc` is a diff nobody reads and a file every run rewrites.
 - `LOCKED.md` - the owner's rulings, the release record and the step decisions behind them; a human audit trail, never loaded by a session.
 - `context.config.json` - **this repo's own config**: every path points under `skeleton/context/`, `installed` and `ported` are disabled (the shipped shells hold markers), `verified` is advisory. The host's starting config is the separate file inside `skeleton/`, copied with it.
 - `tests/` - `test_gates.py`: `python -m unittest discover -s tests`; every gate fails on its own defect fixture and passes on a clean tree. Not copied to a host: it tests the tool, not the memory tree.
-- `.github/workflows/context.yml` - this repo's own CI: `skeleton/scripts/contextctl.py check --all` over the shipped tree, then the tests. A host copies `port/hooks/ci.yml` instead.
+- `.github/workflows/context.yml` - this repo's own CI: `skeleton/scripts/contextctl.py check --all` over the shipped tree, then the tests. **A host has no equivalent in an install**: copying this tree lands no workflow and edits no CI, and a host that wants CI adapts `port/hooks/ci.yml` itself.
 
 ## skeleton/ - the shells a host fills
 
@@ -57,7 +57,7 @@ drift).
 - `skill-stub/SKILL.md` - the pointer a non-canonical harness gets when it reads its own skill directory: same frontmatter so it still loads, then the canonical path and a stop-if-missing rule; here because it exists only when a host runs two skill-reading harnesses.
 - `AGENTS-stub.md` - the pointer at `CLAUDE.md` for a harness that reads `AGENTS.md` while `CLAUDE.md` is canonical; here because Claude reads one **instead of** the other, never both.
 - `hooks/README.md` - the four hook **intents** and what each level costs; read when choosing enforcement; stable.
-- `hooks/pre-commit.sh`, `pre-commit.ps1`, `ci.yml` - the intents as shapes to adapt: gate the commit, gate the merge; **never installed by default**; change only when the tooling does.
+- `hooks/pre-commit.sh`, `pre-commit.ps1`, `ci.yml` - the intents as shapes to adapt: gate the commit, gate the merge; **never installed by default**, and a host's existing CI is never added to or merged into; change only when the tooling does.
 - `hooks/copilot-vscode-hooks.json` - the Copilot hook intent, here because **no repository-level hook path could be verified**; a guess inside `skeleton/` would be trusted and then not load.
 - `hooks/cursor-hooks.json` - `sessionStart` / `stop` for Cursor; event names verified, payload schema not; here because it **executes**.
 - `hooks/codex-hooks.json` - `SessionStart` / `Stop` for Codex; event names verified, object shape not; here because it **executes**, and a non-managed hook needs a human to trust it first.

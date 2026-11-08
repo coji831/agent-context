@@ -8,7 +8,10 @@
 ## The gate set
 
 **Nothing here runs on its own.** No hook, no CI job and no turn-end check is installed by any step of this
-repo; `port/hooks/` holds shapes and says so, and gates run at a milestone or when the owner asks. So
+repo; `port/hooks/` holds shapes and says so, and gates run at a milestone or when the owner asks. An install
+copies files and one script: it adds **no workflow**, changes **no CI config** and requires **no status
+check**, and a host that already runs CI never has this tree's example workflow added alongside or merged into
+it. So
 "posture: gate" below means **blocking when the owner runs `check`**, not blocking something nobody asked
 for. Every gate guards an **`act`**; none guards an `ask` or `owner` trigger, since those are questions put
 to a human when they matter. *Cadence* says where a gate *belongs*, so a host wiring
@@ -18,10 +21,10 @@ to a human when they matter. *Cadence* says where a gate *belongs*, so a host wi
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | default | `register` | both | Every folder under `topics_dir` has exactly one row in `index_of_topics`, every row names a folder that exists, and each row's date equals that topic `README.md`'s `Verified:` date. | A topic on disk the register does not name; a row still pointing at a folder deleted at drain; a topic re-read while its register row keeps the old date. | `FAIL register context/topics/INDEX.md:9: row names "pricing/", no such folder` | commit | gate | must |
 | default | `leaf-index` | both | Every `L-####-*.md` names a row in its nearest index (the topic `## Leaves`, or its family `README.md`), and every row names a file that exists. | A leaf written and never indexed, so no later session knows it exists; a row whose leaf was deleted instead of rewritten. | `FAIL leaf-index context/topics/widget/L-0003-x.md: no row in context/topics/widget/README.md` | commit | gate | must |
-| default | `shape` | both | Fixed shapes hold: a leaf's frontmatter (or its first two lines) carries `id:` and `brief:`; every `HANDOFF.md` carries `## Now`; every register and `## Leaves` row carries a date and a brief; every `decisions.md` row carries a `D-####` id; each `MEMORY.md` entry is one line. | A leaf that cannot be cited by id; a handoff whose next session has no first action; a decision row nothing can cite; a fact that grew a body under its bullet. | `FAIL shape context/topics/widget/HANDOFF.md: no "## Now" heading; the next session has no first action` | commit | gate | should |
+| default | `shape` | both | Fixed shapes hold: a leaf's frontmatter (or its first two lines) carries `id:` and `brief:`; every `HANDOFF.md` carries `## Now`; every register and `## Leaves` row carries a date and a brief; every `decisions.md` row carries a `D-####` id; each `MEMORY.md` entry is one line. A missing `id` is reported **in the terms of the `leaf_pattern` in force** - `id: L-####` for the default, the configured pattern for a host that overrides it - and the message always names the two legal forms: the pattern's match, or the file stem. | A leaf that cannot be cited by id; a handoff whose next session has no first action; a decision row nothing can cite; a fact that grew a body under its bullet; and a host told to add an id shape its own config says it does not use. | `FAIL shape context/topics/widget/HANDOFF.md: no "## Now" heading; the next session has no first action` | commit | gate | should |
 | default | `caps` | both | Every count is inside its configured cap: `HANDOFF.md` lines, `MUST-KNOW.md` rules and rule characters, `MEMORY.md` lines, leaf lines, topic `README.md` lines, and fan-out (more than 10 rows needs a family index). | A handoff grown to a thousand lines with the real next step at its end; a topic README listing thirty leaves flat. | `FAIL caps context/topics/widget/HANDOFF.md: 214 lines, max 90; move the history to JOURNEY.md and rewrite the snapshot` | milestone | gate | should |
 | opt-in | `briefs` | both | No two leaves in **one topic** have `brief` lines above **0.82** similarity - calibrated 2026-11-08: 29 hard negatives (same topic, different conclusions) max at 0.649, so 0.82 leaves a 0.17 margin and fires on 0 of them. | Two leaves holding one conclusion, the second written instead of the first rewritten - **near-verbatim only**: a copy with a word changed scores above 0.9, a rephrasing scores 0.4-0.6 and is deliberately missed. | `FAIL briefs context/topics/widget/README.md:11: brief of L-0003 is 0.86 similar to L-0001` | CI | gate | could |
-| opt-in | `verified` | both | A topic `README.md`'s `Verified:` date is not older than the newest **git commit date** among the leaves it indexes (`git log -1 --format=%cs`), never a filesystem mtime. | A topic re-read and one leaf rewritten, while the entry still shows last month's date. | `FAIL verified context/topics/widget/README.md:3: Verified: 2026-09-01, 41 days behind L-0002` | CI (2.7 s at 80 leaves, 17.5 s at 500 - one git spawn each, measured 2026-11-08) | gate | could |
+| opt-in | `verified` | both | A topic `README.md`'s `Verified:` date is not older than the newest **git commit date** among the leaves it indexes (`git log -1 --format=%cs`), never a filesystem mtime - and a **shallow** clone is refused before any date is compared: `git rev-parse --is-shallow-repository` is asked first, and one blocking finding says no date was checked, because a depth-1 boundary commit has no parent and git reports it as the root commit that added every file. | A topic re-read and one leaf rewritten, while the entry still shows last month's date; and a clone that would answer every leaf with the boundary commit's date and print no complaint. | `FAIL verified context/topics/widget/README.md:3: Verified: 2026-09-01, 41 days behind L-0002`; `FAIL verified context: the clone is shallow, so ... no date was checked` | CI (2.7 s at 80 leaves, 17.5 s at 500 - one git spawn each, measured 2026-11-08) | gate | could |
 | opt-in | `pointers` | both | Every backticked path in `MEMORY.md`, the root rules, the entry block and a topic `README.md` resolves from the tree root, unless it matches an `accepted_absent` entry or begins `~/` or `$HOME/`. | A citation to a file that moved, so a reader follows a dead pointer and trusts nothing after it. | `FAIL pointers context/MEMORY.md:12: "docs/runbook.md" does not resolve` | milestone | gate | should |
 | opt-in | `ported` | host only | Every path listed in `shells` carries a `ported: <YYYY-MM-DD>` line. | A filled rule shell with nothing dating it, so a human cannot rank it against the contract. | `FAIL ported .claude/rules/context.md:3: no "ported:" line` | milestone | gate | once |
 
@@ -43,6 +46,11 @@ once: `no column names a file, so this table cannot index leaves; its header is 
 names the header it read, so a reader knows what to change, and one finding is right because the defect is
 the table's shape, not its contents: no row is resolved and no unlisted-leaf sweep runs for that README.
 `id` beside a file column - `id | Leaf | Brief` - is the documented shape and is read exactly as before.
+A cell written as a **markdown link** names the link's **target**, with any `./` prefix stripped:
+`` [`01-clusters.md`](./01-clusters.md) `` resolves to `01-clusters.md`. Writing a table cell as a link is
+the ordinary habit, and reading the whole cell as a file name reported 10 false findings on a real host -
+`row names "[`01-clusters.md`](./01-clusters.md)", no such file`. A cell with no link keeps the old
+reading exactly, and a link whose target does not exist is still one finding, naming the target.
 A row line that a separator line follows is a **header**, so it is never a body row. A table with
 no separator anywhere is read in the contract's own order, `id | Leaf | Brief` - the leaf column is the
 second - so a hand-written table without a header is still read and no column is ever invented.
@@ -139,6 +147,18 @@ zero files has silently passed. Three obligations, and they bind the tool:
    says what it measured. It is **advisory**: a tree drained to its last leaf is legitimately leaf-free, so
    a blocking finding would fail a correct drain and teach an operator to switch the gate off. A pattern
    that does not compile exits **2** before any gate runs, like any other config error.
+5. **A clone that cannot answer truthfully is refused, not believed.** `verified` asks
+   `git rev-parse --is-shallow-repository` **before** it compares any date, because in a depth-1 clone the
+   boundary commit has no parent and git reports it as the root commit that added every file: `git log -1
+   --format=%cs -- <leaf>` then returns that one commit's date for every leaf, so the
+   `undated == len(leaves)` guard cannot fire and `ok ... 0 leaves without history` is a confident wrong
+   answer. Measured on a real host, 2026-11-08: a depth-1 clone of 97 commits dated every sampled leaf
+   `2026-11-08`, the clone boundary, where the true date was `2026-10-23`. So a shallow clone prints
+   **one** finding for the whole run - `the clone is shallow, so the last-commit date git reports for a
+   leaf is the clone boundary's, not the leaf's; no date was checked` - prints no per-leaf comparison,
+   names the remedy (`fetch-depth: 0` on checkout, or `git fetch --unshallow`), and **blocks**: a silent
+   wrong answer is worse than a loud failure. A host that cannot provide history lists `verified` in
+   `checks_advisory`, which is the opt-out that already exists.
 
 ## The config surface
 

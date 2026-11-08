@@ -10,7 +10,9 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -292,6 +294,43 @@ class LeafColumns(Base):
         self.assert_passes("check", "--only", "leaf-index")
 
 
+class LinkCells(Base):
+    """A table cell written as a markdown link names the link's target, not the whole cell.
+
+    Writing ``[`01-clusters.md`](./01-clusters.md)`` is the ordinary habit, and on a real host it produced
+    10 findings of ``row names "[`01-clusters.md`](./01-clusters.md)", no such file``. A bare backticked
+    cell must behave exactly as it did.
+    """
+
+    def leaves_section(self, row: str) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n"
+                        "| Leaf | What it answers |\n| --- | --- |\n" + row)
+
+    def test_a_link_cell_resolves(self) -> None:
+        self.leaves_section("| [`L-0001-widget.md`](./L-0001-widget.md) | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_a_link_cell_in_a_family_index_resolves(self) -> None:
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n| id | Leaf | Brief |\n| --- | --- | --- |\n"
+                        "| `L-0002` | [`L-0002-plan.md`](./L-0002-plan.md) | the order of the phases |\n")
+        self.tree.write("context/topics/widget/plan/L-0002-plan.md",
+                        "---\nid: L-0002\nbrief: the order of the phases\n---\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_a_link_to_a_missing_file_names_the_target(self) -> None:
+        self.leaves_section("| [`L-0009-gone.md`](./L-0009-gone.md) | a leaf that is not there |\n")
+        out = self.assert_fails_with('row names "L-0009-gone.md", no such file',
+                                     "check", "--only", "leaf-index")
+        self.assertEqual(out.count("no such file"), 1, out)
+        self.assertNotIn("](", out)
+
+    def test_a_bare_backtick_cell_is_unchanged(self) -> None:
+        self.leaves_section("| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+
 ID_ONLY_README = ("# widget\n\nVerified: {today}\n\n## Leaves\n\n"
                   "| id | Brief |\n| --- | --- |\n| `NN-01` |  |\n")
 
@@ -374,6 +413,45 @@ class IdOnlyTable(Base):
         self.assertEqual(code, 1, out)
         self.assertIn("context/topics/widget/NN-02-b.md", out)
         self.assertNotIn("README.md:", out)
+
+
+class LeafIdMessage(Base):
+    """`shape` names the id the configured pattern asks for, not the default one a host does not use.
+
+    `leaf_pattern` was honoured by the file matcher and not by this message, so a host numbering its notes
+    `NN-name.md` was told to add `id: L-####` - an id shape its own config says it does not use.
+    """
+
+    def numbered(self, body: str) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^\\d{2}-"})
+        self.tree.write("context/topics/widget/01-scheduler.md", body)
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n| Leaf | What it answers |\n"
+                        "| --- | --- |\n| `01-scheduler.md` | what the batch size measured |\n")
+
+    def test_a_configured_pattern_is_named_not_the_default(self) -> None:
+        self.numbered("---\nbrief: what the batch size measured\n---\n")
+        out = self.assert_fails_with("no leaf id in the frontmatter", "check", "--only", "shape")
+        self.assertIn("\\d{2}-", out)
+        self.assertNotIn("L-####", out)
+
+    def test_the_message_names_both_legal_forms(self) -> None:
+        self.numbered("---\nbrief: what the batch size measured\n---\n")
+        code, out = self.tree.run("check", "--only", "shape")
+        self.assertEqual(code, 1, out)
+        self.assertIn("`01-`", out)
+        self.assertIn("file stem `01-scheduler`", out)
+
+    def test_either_form_is_accepted(self) -> None:
+        self.numbered("---\nid: 01-scheduler\nbrief: what the batch size measured\n---\n")
+        self.assert_passes("check", "--only", "shape")
+
+    def test_the_default_pattern_still_names_L_hyphen(self) -> None:
+        self.tree.write("context/topics/widget/L-0001-widget.md", "---\nbrief: b\n---\n")
+        code, out = self.tree.run("check", "--only", "shape")
+        self.assertEqual(code, 1, out)
+        self.assertIn("`id: L-####`", out)
+        self.assertIn("file stem `L-0001-widget`", out)
 
 
 class Shape(Base):
@@ -572,6 +650,14 @@ class ShippedWorkflows(unittest.TestCase):
         self.assertEqual(checked, len(self.WORKFLOWS),
                          f"only {checked} of {len(self.WORKFLOWS)} shipped workflows were read")
 
+    def test_the_adopter_workflow_declares_itself_optional(self) -> None:
+        """The owner's instruction: a tree must not affect an existing CI, so the example must say so."""
+        text = self.read("port/hooks/ci.yml")
+        for needle in ("EXAMPLE ONLY", "OPTIONAL", "NOT PART OF AN INSTALL",
+                       "must not have this workflow added alongside its own or merged into it",
+                       "fetch-depth: 0"):
+            self.assertIn(needle, text, f"port/hooks/ci.yml does not state {needle!r}")
+
     def test_checkout_fetches_the_full_history(self) -> None:
         checked = 0
         for name in self.WORKFLOWS:
@@ -633,6 +719,105 @@ class Verified(Base):
         self.tree.write("context/topics/INDEX.md", index)
         self.tree.git()
         self.assert_fails_with("days behind L-0001", "check", "--only", "verified")
+
+
+class ShallowClone(Base):
+    """A depth-1 clone must not turn the clone boundary into every leaf's last-commit date.
+
+    Measured on a real host: a depth-1 clone of a 97-commit repo dated every sampled leaf at the
+    boundary commit - 2026-11-08 where the true date was 2026-10-23 - and printed
+    `0 leaves without history`. The guard `undated == len(leaves)` cannot fire there, because the
+    boundary commit has no parent and git presents it as the root commit that added every file.
+    A silent wrong answer is worse than a loud failure, so the shallow case is one blocking finding.
+    """
+
+    def aged_tree(self) -> None:
+        """The leaf last changed 2020-01-01; a later commit touches only `MEMORY.md`."""
+        for name in ("context/topics/widget/README.md", "context/topics/INDEX.md"):
+            self.tree.write(name, self.tree.read(name).replace(TODAY, "2020-06-01"))
+        git = self.tree.root / ".git"
+        for path in [git, *git.rglob("*")]:
+            if path.is_file():
+                os.chmod(path, 0o700)
+        shutil.rmtree(git)
+        self.git_at("old tree", "2020-01-01T00:00:00")
+        self.tree.append("context/MEMORY.md", "- the tree was aged for a clone test\n")
+        self.git_at("later edit", TODAY + "T00:00:00")
+
+    def git_at(self, message: str, when: str) -> None:
+        env = dict(os.environ, GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
+        for command in (["init", "-q"], ["add", "-A"],
+                        ["-c", "user.email=t@example.com", "-c", "user.name=t",
+                         "commit", "-qm", message]):
+            subprocess.run(["git", "-C", str(self.tree.root)] + command,
+                           capture_output=True, text=True, env=env)
+
+    def clone(self, depth: str | None) -> Path:
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        target = Path(holder.name) / "clone"
+        command = ["git", "clone", "-q"]
+        command += ["--depth", depth] if depth else []
+        done = subprocess.run(command + [self.tree.root.as_uri(), str(target)],
+                              capture_output=True, text=True)
+        if done.returncode != 0:
+            self.skipTest(f"git clone is unavailable here: {done.stderr.strip()}")
+        return target
+
+    def run_at(self, root: Path, *args: str) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            code = contextctl.main(["--root", str(root)] + list(args))
+        return code, buffer.getvalue()
+
+    def test_the_premise_the_boundary_commit_dates_an_old_file(self) -> None:
+        self.aged_tree()
+        full = subprocess.run(["git", "-C", str(self.tree.root), "log", "-1", "--format=%cs",
+                               "--", "context/topics/widget/L-0001-widget.md"],
+                              capture_output=True, text=True).stdout.strip()
+        shallow = subprocess.run(["git", "-C", str(self.clone("1")), "log", "-1", "--format=%cs",
+                                  "--", "context/topics/widget/L-0001-widget.md"],
+                                 capture_output=True, text=True).stdout.strip()
+        self.assertEqual(full, "2020-01-01")
+        self.assertEqual(shallow, TODAY)
+
+    def test_one_finding_says_the_dates_were_not_checked(self) -> None:
+        self.aged_tree()
+        code, out = self.run_at(self.clone("1"), "check", "--only", "verified")
+        self.assertEqual(code, 1, out)
+        self.assertIn("shallow", out)
+        self.assertEqual(out.count("shallow clone"), 1, out)
+        self.assertNotIn("days behind", out)
+        self.assertNotIn("leaves without history", out)
+        self.assertIn("fetch-depth: 0", out)
+        self.assertIn("git fetch --unshallow", out)
+
+    def test_the_finding_is_blocking_and_its_advisory_opt_out_exists(self) -> None:
+        self.aged_tree()
+        target = self.clone("1")
+        code, out = self.run_at(target, "check", "--only", "verified", "--warn")
+        self.assertEqual(code, 0, out)
+        self.assertIn("shallow", out)
+        self.tree.config({"shells": [".claude/rules/context.md"], "checks_advisory": ["verified"]})
+        (target / "context.config.json").write_text(
+            (self.tree.root / "context.config.json").read_text(encoding="utf-8"), encoding="utf-8")
+        code, out = self.run_at(target, "check", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertIn("shallow", out)
+
+    def test_a_full_clone_is_unchanged_and_compares_dates(self) -> None:
+        self.aged_tree()
+        target = self.clone(None)
+        code, out = self.run_at(target, "check", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("shallow", out)
+        self.assertIn("1 dated topics, 0 leaves without history", out)
+
+    def test_a_full_clone_prints_the_same_run_as_the_source_tree(self) -> None:
+        code, source = self.tree.run("check", "--all")
+        cloned, out = self.run_at(self.clone(None), "check", "--all")
+        self.assertEqual((code, cloned), (0, 0), source + out)
+        self.assertEqual(source, out)
 
 
 class Liveness(Base):
