@@ -92,7 +92,9 @@ and the topic README's index repeats both. That is what makes a leaf citable fro
 names an id and never a line number, and checkable when the leaf is rewritten.
 
 `decisions.md` is the one leaf whose **name** is fixed rather than derived from an id; its rows carry the
-ids instead, `D-####`, and a `JOURNEY` entry cites the row it produced. It is not listed in `## Leaves`.
+ids instead, `D-####`, and a `JOURNEY` entry cites the row it produced. That is also why it is not listed in
+`## Leaves`: the leaf table indexes conclusions, not choices, and a choice is cited by its `D-####` row
+rather than by a leaf id.
 
 ## Nesting and naming `[concept]`
 

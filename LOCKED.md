@@ -51,6 +51,25 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.1 - the first patch
+
+**1.0.1, 2026-11-08.** Three defects, none of them found by a gate: a session with no knowledge of this
+design adopted a host repo and reported where the written rules left it to guess.
+
+| Was | Is |
+| --- | --- |
+| the rule block's `MEMORY.md` row routed one kind of fact, while `MEMORY.md` accepts three - what the repo is and how to run it, a convention that spans topics, and where an external system lives - so an external host and its log path had no route in the block | the row names all three; the block's other rows were checked against the contract and needed no change |
+| `MANIFEST.md` § *Install* step 2 still said `git mv AGENTS.md CLAUDE.md` with no note that the copy must be tracked, the defect `ADOPT.md` step 5 had already fixed | it points at `ADOPT.md` step 5 instead of restating it, so the instruction has one copy |
+| the contract's leaf-identity section explained that `decisions.md` is absent from `## Leaves` by reference to the tool's own patterns, so the rule was unreadable without the source | the rule is stated whole: the rows carry `D-####` ids, so the leaf table indexes conclusions and not choices |
+
+### The first observation of the adoption check
+
+The two behavioural checks `ADOPT.md` step 8 asks for - the read order, and whether the scoped rule fires -
+were **observed** for the first time on 2026-11-08, by a session with no knowledge of this design. It read
+`MEMORY.md`, then `MUST-KNOW.md`, then the topic register, and stopped; and it routed a decision to a new
+topic's `decisions.md` while quoting the filled rule shell. Only a live session can produce this evidence,
+which is why it was quoted rather than observed until now.
+
 ## The first release
 
 **1.0.0, 2026-11-08.** Four iterations preceded it and none of them left this machine, so the record below is

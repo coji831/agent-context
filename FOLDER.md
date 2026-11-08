@@ -15,7 +15,7 @@ opened. Then `context/MUST-KNOW.md`, then the one topic the task touches, then s
 - `ADOPT.md` - the runbook an agent follows to put the tree on a host repo, fresh or add-on; when adopting, and never again.
 - `AGENTIC-SYSTEM.md` - how a harness connects at all: the authoring map (§0 - where each artefact is edited), the three connection layers in order with what each silently does without, per harness the file that must exist, the write contract, the dispute order, and one worked arrival; when the wiring is in question.
 - `MECHANISM.md` - **how the tree is used**: the five stages with the file each writes and its mutability, the operations at each turn, who may perform each one without asking (`act` / `ask` / `owner`), one worked session; on demand, when the operation or a write's authority is in question, never loaded by a session.
-- `VERSION` - `1.0.0`; read by tooling and humans, never by a session. What the first release contains, and the decisions behind it: `LOCKED.md`.
+- `VERSION` - `1.0.1`; read by tooling and humans, never by a session. What the first release contains, and the decisions behind it: `LOCKED.md`.
 - `.gitattributes` - `* text=auto eol=lf`, with `.ps1` at CRLF; read by git, never by a session. It is load-bearing rather than tidy: a CRLF `port/hooks/pre-commit.sh` fails under bash with `$'\r': command not found`, which is a hook that looks installed and cannot run.
 - `.gitignore` - `__pycache__/` and `*.py[cod]`, plus the two tool caches; read by git, never by a session. A committed `.pyc` is a diff nobody reads and a file every run rewrites.
 - `LOCKED.md` - the owner's rulings, the release record and the step decisions behind them; a human audit trail, never loaded by a session.
