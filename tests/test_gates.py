@@ -10,7 +10,9 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -633,6 +635,105 @@ class Verified(Base):
         self.tree.write("context/topics/INDEX.md", index)
         self.tree.git()
         self.assert_fails_with("days behind L-0001", "check", "--only", "verified")
+
+
+class ShallowClone(Base):
+    """A depth-1 clone must not turn the clone boundary into every leaf's last-commit date.
+
+    Measured on a real host: a depth-1 clone of a 97-commit repo dated every sampled leaf at the
+    boundary commit - 2026-11-08 where the true date was 2026-10-23 - and printed
+    `0 leaves without history`. The guard `undated == len(leaves)` cannot fire there, because the
+    boundary commit has no parent and git presents it as the root commit that added every file.
+    A silent wrong answer is worse than a loud failure, so the shallow case is one blocking finding.
+    """
+
+    def aged_tree(self) -> None:
+        """The leaf last changed 2020-01-01; a later commit touches only `MEMORY.md`."""
+        for name in ("context/topics/widget/README.md", "context/topics/INDEX.md"):
+            self.tree.write(name, self.tree.read(name).replace(TODAY, "2020-06-01"))
+        git = self.tree.root / ".git"
+        for path in [git, *git.rglob("*")]:
+            if path.is_file():
+                os.chmod(path, 0o700)
+        shutil.rmtree(git)
+        self.git_at("old tree", "2020-01-01T00:00:00")
+        self.tree.append("context/MEMORY.md", "- the tree was aged for a clone test\n")
+        self.git_at("later edit", TODAY + "T00:00:00")
+
+    def git_at(self, message: str, when: str) -> None:
+        env = dict(os.environ, GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
+        for command in (["init", "-q"], ["add", "-A"],
+                        ["-c", "user.email=t@example.com", "-c", "user.name=t",
+                         "commit", "-qm", message]):
+            subprocess.run(["git", "-C", str(self.tree.root)] + command,
+                           capture_output=True, text=True, env=env)
+
+    def clone(self, depth: str | None) -> Path:
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        target = Path(holder.name) / "clone"
+        command = ["git", "clone", "-q"]
+        command += ["--depth", depth] if depth else []
+        done = subprocess.run(command + [self.tree.root.as_uri(), str(target)],
+                              capture_output=True, text=True)
+        if done.returncode != 0:
+            self.skipTest(f"git clone is unavailable here: {done.stderr.strip()}")
+        return target
+
+    def run_at(self, root: Path, *args: str) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            code = contextctl.main(["--root", str(root)] + list(args))
+        return code, buffer.getvalue()
+
+    def test_the_premise_the_boundary_commit_dates_an_old_file(self) -> None:
+        self.aged_tree()
+        full = subprocess.run(["git", "-C", str(self.tree.root), "log", "-1", "--format=%cs",
+                               "--", "context/topics/widget/L-0001-widget.md"],
+                              capture_output=True, text=True).stdout.strip()
+        shallow = subprocess.run(["git", "-C", str(self.clone("1")), "log", "-1", "--format=%cs",
+                                  "--", "context/topics/widget/L-0001-widget.md"],
+                                 capture_output=True, text=True).stdout.strip()
+        self.assertEqual(full, "2020-01-01")
+        self.assertEqual(shallow, TODAY)
+
+    def test_one_finding_says_the_dates_were_not_checked(self) -> None:
+        self.aged_tree()
+        code, out = self.run_at(self.clone("1"), "check", "--only", "verified")
+        self.assertEqual(code, 1, out)
+        self.assertIn("shallow", out)
+        self.assertEqual(out.count("shallow clone"), 1, out)
+        self.assertNotIn("days behind", out)
+        self.assertNotIn("leaves without history", out)
+        self.assertIn("fetch-depth: 0", out)
+        self.assertIn("git fetch --unshallow", out)
+
+    def test_the_finding_is_blocking_and_its_advisory_opt_out_exists(self) -> None:
+        self.aged_tree()
+        target = self.clone("1")
+        code, out = self.run_at(target, "check", "--only", "verified", "--warn")
+        self.assertEqual(code, 0, out)
+        self.assertIn("shallow", out)
+        self.tree.config({"shells": [".claude/rules/context.md"], "checks_advisory": ["verified"]})
+        (target / "context.config.json").write_text(
+            (self.tree.root / "context.config.json").read_text(encoding="utf-8"), encoding="utf-8")
+        code, out = self.run_at(target, "check", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertIn("shallow", out)
+
+    def test_a_full_clone_is_unchanged_and_compares_dates(self) -> None:
+        self.aged_tree()
+        target = self.clone(None)
+        code, out = self.run_at(target, "check", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("shallow", out)
+        self.assertIn("1 dated topics, 0 leaves without history", out)
+
+    def test_a_full_clone_prints_the_same_run_as_the_source_tree(self) -> None:
+        code, source = self.tree.run("check", "--all")
+        cloned, out = self.run_at(self.clone(None), "check", "--all")
+        self.assertEqual((code, cloned), (0, 0), source + out)
+        self.assertEqual(source, out)
 
 
 class Liveness(Base):

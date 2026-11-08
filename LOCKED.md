@@ -133,12 +133,24 @@ act-inventory of the release; the sweep's denominator is below it.
 
 | Was | Is |
 | --- | --- |
-| `port/hooks/ci.yml` declared its job `check:` with no `name:`, so the job reported a check called `check` and an adopter's required status check named `context` never reported; and it checked out at depth 1, so the date gate found no commit date on any leaf and blocked every push | the job is named for the required check and checkout sets `fetch-depth: 0`, each with one comment saying why it is load-bearing and `GATES.md` named rather than the spec restated |
+| `port/hooks/ci.yml` declared its job `check:` with no `name:`, so the job reported a check called `check` and an adopter's required status check named `context` never reported; and it checked out at depth 1, so `verified` had no trustworthy history to read (the note below) | the job is named for the required check and checkout sets `fetch-depth: 0`, each with one comment saying why it is load-bearing and `GATES.md` named rather than the spec restated |
 | `MECHANISM.md` Q1 answered "no" with *do the work, write nothing durable, say so* - contradicting the ruling that a decision with no owning topic creates it in that turn with its register row, and contradicting `T1` two screens below it | the routing table is the authority: a fact spanning topics is a `MEMORY.md` line, and a decision with no topic creates it with its row. The restatement is replaced by the reference, the fix used at `git mv` in 1.0.1 |
 | three hook examples wired `contextctl.py brief` with no marker in the file a host copies; only `port/hooks/README.md` and `port/blocks/hook-commands.md` said the command is not shipped | every hook JSON carries the marker, so the shape cannot be mistaken for a working command by a reader who copied it |
 | `AGENTIC-SYSTEM.md` cited `agent/WIRING.md`, "still readable from `54ba837`" - neither that file nor that commit exists in this repository | the pointer is gone and its one claim kept |
 | `port/hooks/README.md` pointed at `../copilot/hooks/`, a folder this repo does not ship | it points at `copilot-vscode-hooks.json`, which exists |
 | `GATES.md` quoted a register line as `1 finding (13 folders, 13 rows)` and a pointers line as `88 tokens in 9 files` | both match what the tool prints: `13 folders, 13 rows`, and `88 cited paths in 9 files` |
+
+### The depth-1 claim was wrong, and 1.0.6 is its first observation
+
+1.0.2 said a depth-1 clone made the date gate "find no commit date on any leaf", and that is **false**. The
+claim was read from the source and never observed. Measured 2026-11-08 on a depth-1 clone of a 97-commit
+repo: the boundary commit has no parent, git presents it as the root commit that added all 346 files, so
+`git log -1 --format=%cs -- <leaf>` returns the boundary date for every leaf - `2026-11-08` where the true
+date was `2026-10-23` - and the gate printed `0 leaves without history`. Nothing was undated, so the
+`undated == len(leaves)` guard could not fire, and the wrong answer was confident. 1.0.6 detects a shallow
+clone before comparing any date and blocks with one finding that names the remedy. **A comment in a
+workflow and a plausible mechanism in a release record are the same defect as a path written from memory
+of a tree: neither is an observation.**
 
 ### The guard, made mechanical
 

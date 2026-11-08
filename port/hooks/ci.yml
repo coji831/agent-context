@@ -18,8 +18,10 @@ jobs:
     name: context
     runs-on: ubuntu-latest
     steps:
-      # Full history, because some gates date a file by its last commit and a depth-1 clone cannot
-      # answer that - the gate then reports the history as unavailable on every push (see `GATES.md`).
+      # fetch-depth: 0 is load-bearing, not tidiness. `verified` reads each leaf's last commit date
+      # (`git log -1 --format=%cs -- <leaf>`). A depth-1 clone makes its boundary commit childless, so git
+      # reports it as the root commit that added every file and every leaf takes that one date. The gate
+      # now detects a shallow clone and fails loudly instead of inventing dates (see `GATES.md`).
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

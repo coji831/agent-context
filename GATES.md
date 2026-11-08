@@ -21,7 +21,7 @@ to a human when they matter. *Cadence* says where a gate *belongs*, so a host wi
 | default | `shape` | both | Fixed shapes hold: a leaf's frontmatter (or its first two lines) carries `id:` and `brief:`; every `HANDOFF.md` carries `## Now`; every register and `## Leaves` row carries a date and a brief; every `decisions.md` row carries a `D-####` id; each `MEMORY.md` entry is one line. | A leaf that cannot be cited by id; a handoff whose next session has no first action; a decision row nothing can cite; a fact that grew a body under its bullet. | `FAIL shape context/topics/widget/HANDOFF.md: no "## Now" heading; the next session has no first action` | commit | gate | should |
 | default | `caps` | both | Every count is inside its configured cap: `HANDOFF.md` lines, `MUST-KNOW.md` rules and rule characters, `MEMORY.md` lines, leaf lines, topic `README.md` lines, and fan-out (more than 10 rows needs a family index). | A handoff grown to a thousand lines with the real next step at its end; a topic README listing thirty leaves flat. | `FAIL caps context/topics/widget/HANDOFF.md: 214 lines, max 90; move the history to JOURNEY.md and rewrite the snapshot` | milestone | gate | should |
 | opt-in | `briefs` | both | No two leaves in **one topic** have `brief` lines above **0.82** similarity - calibrated 2026-11-08: 29 hard negatives (same topic, different conclusions) max at 0.649, so 0.82 leaves a 0.17 margin and fires on 0 of them. | Two leaves holding one conclusion, the second written instead of the first rewritten - **near-verbatim only**: a copy with a word changed scores above 0.9, a rephrasing scores 0.4-0.6 and is deliberately missed. | `FAIL briefs context/topics/widget/README.md:11: brief of L-0003 is 0.86 similar to L-0001` | CI | gate | could |
-| opt-in | `verified` | both | A topic `README.md`'s `Verified:` date is not older than the newest **git commit date** among the leaves it indexes (`git log -1 --format=%cs`), never a filesystem mtime. | A topic re-read and one leaf rewritten, while the entry still shows last month's date. | `FAIL verified context/topics/widget/README.md:3: Verified: 2026-09-01, 41 days behind L-0002` | CI (2.7 s at 80 leaves, 17.5 s at 500 - one git spawn each, measured 2026-11-08) | gate | could |
+| opt-in | `verified` | both | A topic `README.md`'s `Verified:` date is not older than the newest **git commit date** among the leaves it indexes (`git log -1 --format=%cs`), never a filesystem mtime - and a **shallow** clone is refused before any date is compared: `git rev-parse --is-shallow-repository` is asked first, and one blocking finding says no date was checked, because a depth-1 boundary commit has no parent and git reports it as the root commit that added every file. | A topic re-read and one leaf rewritten, while the entry still shows last month's date; and a clone that would answer every leaf with the boundary commit's date and print no complaint. | `FAIL verified context/topics/widget/README.md:3: Verified: 2026-09-01, 41 days behind L-0002`; `FAIL verified context: the clone is shallow, so ... no date was checked` | CI (2.7 s at 80 leaves, 17.5 s at 500 - one git spawn each, measured 2026-11-08) | gate | could |
 | opt-in | `pointers` | both | Every backticked path in `MEMORY.md`, the root rules, the entry block and a topic `README.md` resolves from the tree root, unless it matches an `accepted_absent` entry or begins `~/` or `$HOME/`. | A citation to a file that moved, so a reader follows a dead pointer and trusts nothing after it. | `FAIL pointers context/MEMORY.md:12: "docs/runbook.md" does not resolve` | milestone | gate | should |
 | opt-in | `ported` | host only | Every path listed in `shells` carries a `ported: <YYYY-MM-DD>` line. | A filled rule shell with nothing dating it, so a human cannot rank it against the contract. | `FAIL ported .claude/rules/context.md:3: no "ported:" line` | milestone | gate | once |
 
@@ -139,6 +139,18 @@ zero files has silently passed. Three obligations, and they bind the tool:
    says what it measured. It is **advisory**: a tree drained to its last leaf is legitimately leaf-free, so
    a blocking finding would fail a correct drain and teach an operator to switch the gate off. A pattern
    that does not compile exits **2** before any gate runs, like any other config error.
+5. **A clone that cannot answer truthfully is refused, not believed.** `verified` asks
+   `git rev-parse --is-shallow-repository` **before** it compares any date, because in a depth-1 clone the
+   boundary commit has no parent and git reports it as the root commit that added every file: `git log -1
+   --format=%cs -- <leaf>` then returns that one commit's date for every leaf, so the
+   `undated == len(leaves)` guard cannot fire and `ok ... 0 leaves without history` is a confident wrong
+   answer. Measured on a real host, 2026-11-08: a depth-1 clone of 97 commits dated every sampled leaf
+   `2026-11-08`, the clone boundary, where the true date was `2026-10-23`. So a shallow clone prints
+   **one** finding for the whole run - `the clone is shallow, so the last-commit date git reports for a
+   leaf is the clone boundary's, not the leaf's; no date was checked` - prints no per-leaf comparison,
+   names the remedy (`fetch-depth: 0` on checkout, or `git fetch --unshallow`), and **blocks**: a silent
+   wrong answer is worse than a loud failure. A host that cannot provide history lists `verified` in
+   `checks_advisory`, which is the opt-out that already exists.
 
 ## The config surface
 

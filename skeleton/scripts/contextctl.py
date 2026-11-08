@@ -698,15 +698,59 @@ def git_date(root: Path, rel: str) -> str | None:
     return out if DATE_RE.match(out) else None
 
 
+def git_shallow(root: Path) -> bool:
+    """True when the clone is shallow, so no file's last-commit date can be trusted.
+
+    In a depth-1 clone the boundary commit has no parent, so git presents it as the root commit that
+    added every file and `git log -1 -- <path>` returns that one commit's date for every path. The
+    `undated == len(leaves)` guard never fires there, because nothing is undated - which is why the
+    caller must ask this question *before* comparing any date.
+    """
+    try:
+        done = subprocess.run(["git", "-C", str(root), "rev-parse", "--is-shallow-repository"],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        done = None
+    if done is not None and done.returncode == 0:
+        answer = done.stdout.strip().lower()
+        if answer in ("true", "false"):
+            return answer == "true"
+    # git older than 2.15 has no such query: the marker file is the only signal it offers.
+    try:
+        done = subprocess.run(["git", "-C", str(root), "rev-parse", "--git-dir"],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if done.returncode != 0:
+        return False
+    git_dir = Path(done.stdout.strip() or ".git")
+    if not git_dir.is_absolute():
+        git_dir = root / git_dir
+    return (git_dir / "shallow").exists()
+
+
 def gate_verified(ctx: Ctx) -> Result:
     gate = "verified"
     findings = []
-    scanned = 0
     undated = 0
-    for topic in ctx.topics:
+    dated = [topic for topic in ctx.topics if topic_verified(topic.readme)]
+    if not dated:
+        return zero(gate, ctx.rel(ctx.topics_dir), "dated topics")
+    if git_shallow(ctx.root):
+        findings.append(Finding(gate, ctx.rel(ctx.tree_root), None,
+                                "the clone is shallow, so the last-commit date git reports for a leaf "
+                                "is the clone boundary's, not the leaf's; no date was checked. "
+                                "Fetch the full history and run again (fetch-depth: 0 on checkout, or "
+                                "git fetch --unshallow); a host that cannot provide history can list "
+                                "verified in checks_advisory"))
+        stale = ctx.leaf_warning()
+        if stale is not None:
+            findings.append(stale)
+        return Result(gate, findings, len(dated),
+                      f"{len(dated)} dated topics, no date compared: shallow clone")
+    scanned = 0
+    for topic in dated:
         verified = topic_verified(topic.readme)
-        if not verified:
-            continue
         scanned += 1
         newest = None
         newest_leaf = None
