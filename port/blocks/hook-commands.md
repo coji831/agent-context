@@ -13,5 +13,7 @@ These are the only commands a hook ever needs. Copy the row your harness's event
 Read `--warn` as the default and `check` as the deliberate choice: a gate that behaves the same whether it
 is advisory or blocking is a gate someone disables.
 
-**Only the `check` commands exist so far.** `brief` is not written, so a sessionStart hook fails loudly on
-its first run, which is correct and not a bug to silence with `|| true`.
+**Both `brief` forms exist and neither does anything yet.** `brief` is a stub: it writes no digest, compares
+none, prints why to stderr and exits `0` - deliberately, because a failing session-start hook blocks the
+session it is starting. Read the row as the intent, not as a renderer: until one exists the register is the
+copy.

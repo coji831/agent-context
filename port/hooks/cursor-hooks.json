@@ -1,6 +1,6 @@
 {
   "_comment": "EXAMPLE ONLY - a shape to adapt, not a file to copy blind. Copy to <repo>/.cursor/hooks.json (project level) or the user-level equivalent. Event names below are verified (Cursor hooks docs, 2026-11-07); the payload schema is not.",
-  "_not_shipped": "`python scripts/contextctl.py brief` is NOT written - contextctl ships `check` only, so this sessionStart entry fails loudly on its first run. That is the intended marker, not a bug to hide behind `|| true`: wire `check --all --warn` instead until a renderer exists (see port/hooks/README.md).",
+  "_brief_is_a_stub": "`python scripts/contextctl.py brief` is a STUB: it writes no digest, compares none, prints one message to stderr and exits 0, so this sessionStart entry runs cleanly and changes nothing. Wire it as written and replace the command when a renderer exists (see port/hooks/README.md).",
   "_intent": [
     "sessionStart -> regenerate the digest a new session would read, so it is never the stale copy",
     "stop -> check --all --warn: every finding surfaces, nothing blocks the turn. A stop hook cannot undo work that already ran",
