@@ -10,7 +10,8 @@ durable, decide where it goes:
 - a constraint that applies to every topic → one rule in `context/MUST-KNOW.md`
 - a constraint about one area → that topic's `MUST-KNOW.md`
 - a conclusion with its evidence → a new leaf in the topic that owns it
-- a decision, its reason, and what it ruled out → that topic's `decisions.md`
+- a decision, its reason, and what it ruled out → that topic's `decisions.md`; if no topic owns it, create
+  the topic in that same turn, with its register row
 - a procedure → a skill, never a longer note
 - nothing durable → nowhere; do not write it
 

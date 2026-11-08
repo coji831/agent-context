@@ -53,14 +53,21 @@ construction and is now tested in both directions, so a later refactor cannot qu
 
 ## 1.0.1 - the first patch
 
-**1.0.1, 2026-11-08.** Three defects, none of them found by a gate: a session with no knowledge of this
-design adopted a host repo and reported where the written rules left it to guess.
+**1.0.1, 2026-11-08.** Three defects, none of them found by a gate, and one rule that was never stated: a
+session with no knowledge of this design adopted a host repo and reported where the written rules left it
+to guess.
 
 | Was | Is |
 | --- | --- |
 | the rule block's `MEMORY.md` row routed one kind of fact, while `MEMORY.md` accepts three - what the repo is and how to run it, a convention that spans topics, and where an external system lives - so an external host and its log path had no route in the block | the row names all three; the block's other rows were checked against the contract and needed no change |
 | `MANIFEST.md` § *Install* step 2 still said `git mv AGENTS.md CLAUDE.md` with no note that the copy must be tracked, the defect `ADOPT.md` step 5 had already fixed | it points at `ADOPT.md` step 5 instead of restating it, so the instruction has one copy |
 | the contract's leaf-identity section explained that `decisions.md` is absent from `## Leaves` by reference to the tool's own patterns, so the rule was unreadable without the source | the rule is stated whole: the rows carry `D-####` ids, so the leaf table indexes conclusions and not choices |
+
+### The ruling on a decision no topic owns
+
+| Question | Ruling |
+| --- | --- |
+| Where does a decision go when no topic owns it? | **The topic is created in that same turn, with its register row.** The blind session created one on judgement alone and said so, which proved the rule was unstated; and the alternative put the decision in `MEMORY.md`, whose own header says a fact a topic owns goes in that topic's leaf and nowhere else. The ruling is about a decision needing a home, not a topic for every task - `CONCEPT.md` value 3 stands. |
 
 ### The first observation of the adoption check
 

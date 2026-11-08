@@ -18,6 +18,7 @@
 | a constraint about one area | that topic's `MUST-KNOW.md` |
 | a conclusion with its evidence | a leaf in the topic that owns it |
 | a decision, its reason, what it ruled out | a leaf in the topic that made it - `decisions.md` |
+| the same, when no topic owns it | the topic is created in that same turn, with its register row - a folder with no row is a finding |
 | a procedure | a skill, not a longer note |
 | nothing durable | nowhere - do not write it |
 
