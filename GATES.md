@@ -33,6 +33,21 @@ at install or update, not on a loop. The smallest set that keeps the tree workin
 `leaf-index`; `shape` and `caps` earn their place by costing milliseconds; `pointers` is rated **should**
 and stays opt-in because it measured 16 false findings on a real consumer repo; nothing else earns a default run.
 
+### How a leaf index is read
+
+The leaf column is read from the **header row**, never assumed to be the second column. `Leaf`, `Leaves`,
+`File`, `Files`, `Filename`, or any header containing `leaf` or `file`, names the file column; `id` is used
+only when no column names a file, because an `id` cell is an identity and the file name is what the gate
+resolves. A row line that a separator line follows is a **header**, so it is never a body row. A table with
+no separator anywhere is read in the contract's own order, `id | Leaf | Brief` - the leaf column is the
+second - so a hand-written table without a header is still read and no column is ever invented.
+
+A **topic** `README.md` is read only inside its `## Leaves` heading, and every table under that heading is
+read. A **family** `README.md` (`<topic>/<subdir>/README.md`) carries its index in the **first table whose
+header names a file column**; a family README with no such table has **no index and contributes nothing** -
+no row, and no expectation that a leaf beside it is named - so a family README that holds a prose table is
+not read as a leaf index.
+
 ### The one exception to "off for everything"
 
 **`installed`**, not in the table because it never judges the tree - it judges whether the tree arrived, and

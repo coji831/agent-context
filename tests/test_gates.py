@@ -233,6 +233,65 @@ class LeafIndex(Base):
         self.assert_fails_with('row names "L-0009-gone.md", no such file', "check")
 
 
+class LeafColumns(Base):
+    """The leaf column is read from the header, never assumed to be the second one.
+
+    A host writes `| Leaf | What it answers |`, and a gate that took `cells[1]` read the *brief* as a
+    file name and the header row itself as a row - two findings per table, neither true.
+    """
+
+    def leaves_section(self, table: str) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n" + table)
+
+    def test_host_column_order(self) -> None:
+        self.leaves_section("| Leaf | What it answers |\n| --- | --- |\n"
+                            "| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_published_column_order(self) -> None:
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_two_columns(self) -> None:
+        self.leaves_section("| id | Leaf |\n| --- | --- |\n"
+                            "| `L-0001` | `L-0001-widget.md` |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_no_header_falls_back_to_the_documented_order(self) -> None:
+        self.leaves_section("| `L-0001` | `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_missing_file_is_still_found_in_the_leaf_column(self) -> None:
+        self.leaves_section("| Leaf | What it answers |\n| --- | --- |\n"
+                            "| `L-0009-gone.md` | a leaf that is not there |\n")
+        self.assert_fails_with('row names "L-0009-gone.md", no such file', "check", "--only", "leaf-index")
+
+    def test_a_prose_table_outside_the_leaves_section_is_ignored(self) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## What this is\n\n"
+                        "| Project | Note |\n| --- | --- |\n| pvl-rentals | ask the client first |\n\n"
+                        "## Leaves\n\n| Leaf | What it answers |\n| --- | --- |\n"
+                        "| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_a_family_index_is_the_first_table_naming_a_file(self) -> None:
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n> written during the work.\n\n"
+                        "| Phase | State |\n| --- | --- |\n| one | done |\n\n"
+                        "| id | Leaf | Brief - what it answers |\n| --- | --- | --- |\n"
+                        "| `L-0002` | `L-0002-plan.md` | the order of the phases |\n")
+        self.tree.write("context/topics/widget/plan/L-0002-plan.md",
+                        "---\nid: L-0002\nbrief: the order of the phases\n---\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_a_family_without_a_leaf_table_contributes_nothing(self) -> None:
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n| Phase | State |\n| --- | --- |\n| one | done |\n")
+        self.tree.write("context/topics/widget/plan/L-0002-plan.md",
+                        "---\nid: L-0002\nbrief: the order of the phases\n---\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+
 class Shape(Base):
     def test_leaf_without_brief(self) -> None:
         self.tree.write("context/topics/widget/L-0001-widget.md", "---\nid: L-0001\n---\nbody\n")

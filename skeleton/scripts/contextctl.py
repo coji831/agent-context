@@ -145,24 +145,64 @@ class Topic:
     families: list[Path] = field(default_factory=list)
 
 
+SEPARATOR_CELL = re.compile(r"^:?-{2,}:?$")
+HEADER_WORDS = ("id", "topic", "what", "leaf")
+FILE_HEADERS = ("leaf", "leaves", "file", "files", "filename")
+BRIEF_HEADERS = ("what", "what it answers", "answers")
+
+
+def split_row(text: str) -> list[str]:
+    return [cell.strip() for cell in text.strip().strip("|").split("|")]
+
+
+def is_separator(cells: list[str]) -> bool:
+    filled = [cell for cell in cells if cell]
+    return bool(filled) and all(SEPARATOR_CELL.match(cell) for cell in filled)
+
+
+def is_header_word(cells: list[str]) -> bool:
+    return bool(cells) and cells[0].strip("`").strip().lower() in HEADER_WORDS
+
+
+def row_lines(lines: list[str]) -> list[tuple[int, list[str]]]:
+    return [(number, split_row(raw.strip())) for number, raw in enumerate(lines, 1)
+            if raw.strip().startswith("|")]
+
+
+def table_parts(lines: list[str],
+                offset: int = 0) -> list[tuple[list[str] | None, list[tuple[int, list[str]]]]]:
+    """Every markdown table as (header cells or None, body rows with real line numbers).
+
+    A header is the row-line a separator line follows - the markdown definition - so the header's
+    column names are available to the caller and the header itself is never a body row. A run of rows
+    with no separator anywhere is one headerless table: there is no column name to read, and a caller
+    falls back to the documented column order rather than inventing one.
+    """
+    lines_of = row_lines(lines)
+    starts = [index for index in range(len(lines_of) - 1)
+              if is_separator(lines_of[index + 1][1]) and not is_separator(lines_of[index][1])]
+    if not starts:
+        rows = [(number + offset, cells) for number, cells in lines_of
+                if not is_separator(cells) and not is_header_word(cells)]
+        return [(None, rows)]
+    tables = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(lines_of)
+        header = lines_of[start][1]
+        rows = [(number + offset, cells) for number, cells in lines_of[start + 1:end]
+                if not is_separator(cells)]
+        tables.append((header, rows))
+    return tables
+
+
 def table_rows(lines: list[str]) -> list[tuple[int, list[str]]]:
     """Body rows of every markdown table; header and separator lines dropped."""
-    rows = []
-    for number, raw in enumerate(lines, 1):
-        text = raw.strip()
-        if not text.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in text.strip("|").split("|")]
-        if all(re.fullmatch(r":?-{2,}:?", cell) for cell in cells if cell):
-            continue
-        if cells and cells[0].strip("`").lower() in ("id", "topic", "what"):
-            continue
-        rows.append((number, cells))
-    return rows
+    return [row for _, rows in table_parts(lines) for row in rows]
 
 
-def section_rows(lines: list[str], heading: str) -> list[tuple[int, list[str]]]:
-    """Body rows of the table inside one `## heading`, with real line numbers."""
+def section_parts(lines: list[str],
+                  heading: str) -> list[tuple[list[str] | None, list[tuple[int, list[str]]]]]:
+    """Every table inside one `## heading`, with real line numbers."""
     start = None
     for index, raw in enumerate(lines):
         match = HEADING.match(raw)
@@ -176,8 +216,45 @@ def section_rows(lines: list[str], heading: str) -> list[tuple[int, list[str]]]:
         if HEADING.match(lines[index]):
             end = index
             break
-    offset = start
-    return [(number + offset, cells) for number, cells in table_rows(lines[start:end])]
+    return table_parts(lines[start:end], offset=start)
+
+
+def section_rows(lines: list[str], heading: str) -> list[tuple[int, list[str]]]:
+    """Body rows of the tables inside one `## heading`, with real line numbers."""
+    return [row for _, rows in section_parts(lines, heading) for row in rows]
+
+
+def header_name(cell: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", cell.strip().strip("`").lower())).strip()
+
+
+def leaf_column(header: list[str] | None) -> int | None:
+    """Index of the column naming a leaf file, from the header row - or None if none names one.
+
+    `Leaf`, `Leaves`, `File` and any header containing one of those words win over `id`, because the
+    row's *file name* is what the gate resolves: `| id | Leaf | Brief |` puts the id first and the file
+    second, and reading the id as the file reports a leaf as missing. `id` is used only when no column
+    names a file.
+    """
+    if not header:
+        return None
+    names = [header_name(cell) for cell in header]
+    for index, name in enumerate(names):
+        if name in FILE_HEADERS or "leaf" in name or "file" in name:
+            return index
+    for index, name in enumerate(names):
+        if name == "id":
+            return index
+    return None
+
+
+def brief_column(header: list[str] | None, leaf: int) -> int:
+    """Index of the column saying what the leaf answers; the one after the leaf when it is unlabelled."""
+    for index, cell in enumerate(header or []):
+        name = header_name(cell)
+        if "brief" in name or name in BRIEF_HEADERS:
+            return index
+    return leaf + 1
 
 
 def rule_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
@@ -336,18 +413,31 @@ def gate_leaf_index(ctx: Ctx) -> Result:
             continue
         indexes = [topic.readme] + [family / "README.md" for family in topic.families]
         for index in indexes:
-            scanned += 1
             lines = (ctx.read(index) or "").splitlines()
-            rows = section_rows(lines, "## Leaves") if index == topic.readme else table_rows(lines)
+            if index == topic.readme:
+                tables = section_parts(lines, "## Leaves") or [(None, [])]
+            else:
+                tables = []
+                for header, rows in table_parts(lines):
+                    if leaf_column(header) is not None:
+                        tables = [(header, rows)]
+                        break
+            if not tables:
+                continue
+            scanned += 1
             listed = []
-            for number, cells in rows:
-                if len(cells) < 2:
-                    continue
-                leaf_name = cells[1].strip("`").strip()
-                listed.append(leaf_name)
-                if not (index.parent / leaf_name).exists():
-                    findings.append(Finding(gate, ctx.rel(index), number,
-                                            f'row names "{leaf_name}", no such file'))
+            for header, rows in tables:
+                column = leaf_column(header)
+                if column is None:
+                    column = 1
+                for number, cells in rows:
+                    if len(cells) <= column:
+                        continue
+                    leaf_name = cells[column].strip("`").strip()
+                    listed.append(leaf_name)
+                    if not (index.parent / leaf_name).exists():
+                        findings.append(Finding(gate, ctx.rel(index), number,
+                                                f'row names "{leaf_name}", no such file'))
             for leaf in ctx.leaves:
                 if leaf.path.parent == index.parent and leaf.path.name not in listed:
                     findings.append(Finding(gate, leaf.rel, None, f"no row in {ctx.rel(index)}"))
@@ -388,8 +478,14 @@ def gate_shape(ctx: Ctx) -> Result:
         readme = ctx.read(topic.readme)
         if readme is not None:
             examined += 1
-            for number, cells in section_rows(readme.splitlines(), "## Leaves"):
-                if len(cells) < 3 or not cells[2].strip("`").strip():
+            for header, rows in section_parts(readme.splitlines(), "## Leaves"):
+                column = leaf_column(header)
+                if column is None:
+                    column = 1
+                brief = brief_column(header, column)
+                for number, cells in rows:
+                    if len(cells) <= brief or cells[brief].strip("`").strip():
+                        continue
                     findings.append(Finding(gate, ctx.rel(topic.readme), number,
                                             "leaf row has no brief; the table exists so the leaf stays shut"))
         decisions = topic.dir / "decisions.md"
@@ -483,9 +579,13 @@ def gate_briefs(ctx: Ctx) -> Result:
     for topic in ctx.topics:
         lines = (ctx.read(topic.readme) or "").splitlines()
         row_line = {}
-        for number, cells in section_rows(lines, "## Leaves"):
-            if len(cells) >= 2:
-                row_line[cells[1].strip("`").strip()] = number
+        for header, rows in section_parts(lines, "## Leaves"):
+            column = leaf_column(header)
+            if column is None:
+                column = 1
+            for number, cells in rows:
+                if len(cells) > column:
+                    row_line[cells[column].strip("`").strip()] = number
         own = [leaf for leaf in ctx.topics_of(topic) if leaf.brief]
         briefs += len(own)
         for index, first in enumerate(own):
