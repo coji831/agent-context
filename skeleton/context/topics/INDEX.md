@@ -10,3 +10,4 @@
 | Topic | What it covers | Verified |
 | --- | --- | --- |
 | `context/topics/widget/` | example topic shipped with the skeleton - replace it with your first real one | 2026-01-01 |
+| `context/topics/does-not-exist/` | phantom row, proving the register gate blocks | 2026-11-08 |
