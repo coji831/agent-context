@@ -292,6 +292,90 @@ class LeafColumns(Base):
         self.assert_passes("check", "--only", "leaf-index")
 
 
+ID_ONLY_README = ("# widget\n\nVerified: {today}\n\n## Leaves\n\n"
+                  "| id | Brief |\n| --- | --- |\n| `NN-01` |  |\n")
+
+
+class IdOnlyTable(Base):
+    """A table whose only identifier is `id` cannot index leaves, and says so once.
+
+    An `id` cell is an identity, not a file name: resolving it as one reports the row's leaf as missing
+    and the leaf as unindexed - two false findings replacing one true fact. The gate reports that the
+    table cannot index leaves, naming the header it saw, and resolves no row from it.
+    """
+
+    def id_only(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^NN-\\d{2}"})
+        self.tree.write("context/topics/widget/README.md", ID_ONLY_README)
+        self.tree.write("context/topics/widget/NN-01-a.md", "---\nid: NN-01\nbrief: b\n---\n")
+
+    def test_one_finding_and_neither_row_nor_leaf_is_reported(self) -> None:
+        self.id_only()
+        code, out = self.tree.run("check", "--only", "leaf-index")
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out.count("cannot index leaves"), 1, out)
+        self.assertEqual(out.count("no such file"), 0, out)
+        self.assertEqual(out.count("no row in"), 0, out)
+
+    def test_the_finding_names_the_header_it_saw(self) -> None:
+        self.id_only()
+        code, out = self.tree.run("check", "--only", "leaf-index")
+        self.assertEqual(code, 1, out)
+        self.assertIn("id | Brief", out)
+
+    def test_the_documented_column_order_still_indexes(self) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n"
+                        "| id | Leaf | Brief |\n| --- | --- | --- |\n"
+                        "| `L-0001` | `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_a_header_with_no_id_still_passes(self) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n"
+                        "| Leaf | What |\n| --- | --- |\n"
+                        "| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_a_family_readme_of_id_only_reports_once(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^NN-\\d{2}"})
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n"
+                        "| id | Leaf | Brief |\n| --- | --- | --- |\n")
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n| id | Brief |\n| --- | --- |\n| `NN-02` | the order |\n")
+        self.tree.write("context/topics/widget/plan/NN-02-a.md", "---\nid: NN-02\nbrief: the order\n---\n")
+        code, out = self.tree.run("check", "--only", "leaf-index")
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out.count("cannot index leaves"), 1, out)
+        self.assertEqual(out.count("no such file"), 0, out)
+        self.assertEqual(out.count("no row in"), 0, out)
+
+    def test_shape_does_not_report_the_same_false_fact(self) -> None:
+        self.id_only()
+        code, out = self.tree.run("check", "--only", "shape")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("leaf row has no brief", out)
+
+    def test_a_leaves_section_with_no_table_is_unchanged(self) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\nprose, and no table.\n")
+        self.assert_fails_with("no row in context/topics/widget/README.md", "check", "--only", "leaf-index")
+
+    def test_briefs_reads_no_line_from_a_table_it_cannot_resolve(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^NN-\\d{2}",
+                          "briefs": {"threshold": 0.6}})
+        self.tree.write("context/topics/widget/README.md", ID_ONLY_README)
+        self.tree.write("context/topics/widget/NN-01-a.md",
+                        "---\nid: NN-01\nbrief: the rig measured 42 per second at batch sixteen\n---\n")
+        self.tree.write("context/topics/widget/NN-02-b.md",
+                        "---\nid: NN-02\nbrief: the rig measured 42 per second at batch twenty\n---\n")
+        code, out = self.tree.run("check", "--only", "briefs")
+        self.assertEqual(code, 1, out)
+        self.assertIn("context/topics/widget/NN-02-b.md", out)
+        self.assertNotIn("README.md:", out)
+
+
 class Shape(Base):
     def test_leaf_without_brief(self) -> None:
         self.tree.write("context/topics/widget/L-0001-widget.md", "---\nid: L-0001\n---\nbody\n")

@@ -36,17 +36,23 @@ and stays opt-in because it measured 16 false findings on a real consumer repo; 
 ### How a leaf index is read
 
 The leaf column is read from the **header row**, never assumed to be the second column. `Leaf`, `Leaves`,
-`File`, `Files`, `Filename`, or any header containing `leaf` or `file`, names the file column; `id` is used
+`File`, `Files`, `Filename`, or any header containing `leaf` or `file`, names the file column; `id` is chosen
 only when no column names a file, because an `id` cell is an identity and the file name is what the gate
-resolves. A row line that a separator line follows is a **header**, so it is never a body row. A table with
+resolves. A table whose **only** identifier is `id` therefore **cannot index leaves**, and it reports that
+once: `no column names a file, so this table cannot index leaves; its header is "id | Brief"`. The finding
+names the header it read, so a reader knows what to change, and one finding is right because the defect is
+the table's shape, not its contents: no row is resolved and no unlisted-leaf sweep runs for that README.
+`id` beside a file column - `id | Leaf | Brief` - is the documented shape and is read exactly as before.
+A row line that a separator line follows is a **header**, so it is never a body row. A table with
 no separator anywhere is read in the contract's own order, `id | Leaf | Brief` - the leaf column is the
 second - so a hand-written table without a header is still read and no column is ever invented.
 
 A **topic** `README.md` is read only inside its `## Leaves` heading, and every table under that heading is
 read. A **family** `README.md` (`<topic>/<subdir>/README.md`) carries its index in the **first table whose
-header names a file column**; a family README with no such table has **no index and contributes nothing** -
-no row, and no expectation that a leaf beside it is named - so a family README that holds a prose table is
-not read as a leaf index.
+header names a column it can resolve** - a file column, or `id` alone, which reports the finding above and
+resolves no row; a family README with neither has **no index and contributes nothing** - no row, and no
+expectation that a leaf beside it is named - so a family README that holds a prose table is not read as a
+leaf index.
 
 ### The one exception to "off for everything"
 

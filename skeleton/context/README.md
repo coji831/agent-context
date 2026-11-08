@@ -94,7 +94,9 @@ names an id and never a line number, and checkable when the leaf is rewritten.
 
 The index's **header names the column holding the file name** (`Leaf`, or `File`); the gate reads that column
 and never assumes the second one, so `| Leaf | What it answers |` and `| id | Leaf | Brief |` both work. A
-table with no header at all is read in the order above, `id | Leaf | Brief`. A **family** `README.md` is an
+table whose only identifier is `id`, with no column naming a file, is not an index: it cannot say which file
+any row is about, so the gate reports that once instead of resolving it. A table with no header at all is
+read in the order above, `id | Leaf | Brief`. A **family** `README.md` is an
 index only when its first table names a file column: prose in a table is not a leaf index, and a family
 README without one is not read as one.
 

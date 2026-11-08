@@ -51,6 +51,20 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.5 - the id that was read as a file name
+
+**1.0.5, 2026-11-08.** One defect, reproduced against v1.0.4 on a tree whose leaf pattern is `^NN-\d{2}` and
+whose `## Leaves` table is `| id | Brief |`. It is the same class 1.0.4 fixed - a gate reporting a fact about
+its own parser - because 1.0.4 corrected the column **order** and left the `id`-as-file assumption in place.
+
+| Was | Is |
+| --- | --- |
+| `leaf_column()` fell back to the `id` header when no column named a file, and every caller resolved an `id` cell as a file name. One `\| id \| Brief \|` table with one leaf printed **two** false findings - `row names "NN-01", no such file` and `no row in .../README.md` - and `shape` added a third, `leaf row has no brief`, for the same table | `cannot_index()` answers the one question the table raises: a header that names no file column and offers only `id` cannot index leaves. `leaf-index` prints **one** finding for that README, naming the header it read (`no column names a file, so this table cannot index leaves; its header is "id \| Brief"`), and skips row resolution and the unlisted-leaf sweep for it; `shape` and `briefs` skip the same table. A family README of `\| id \| ... \|` gets the same single finding instead of one per row. `id \| Leaf \| Brief` and `Leaf \| What` are read exactly as before |
+
+**Why the third finding mattered.** `shape`'s `leaf row has no brief` was the same false fact stated twice:
+the table's brief cell was read from the wrong row because the row was read at all. A table that cannot index
+leaves has no rows a gate may judge, so the guard is the same guard, not a second one.
+
 ## 1.0.4 - the gates that measured their own parser
 
 **1.0.4, 2026-11-08.** Seven defects, each measured by adopting v1.0.3 onto a real 11-topic host: every one
