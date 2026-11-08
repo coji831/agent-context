@@ -244,6 +244,17 @@ def header_name(cell: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", cell.strip().strip("`").lower())).strip()
 
 
+def file_column(header: list[str] | None) -> int | None:
+    """Index of the column naming a leaf file, from the header row - or None when none names one."""
+    if not header:
+        return None
+    for index, cell in enumerate(header):
+        name = header_name(cell)
+        if name in FILE_HEADERS or "leaf" in name or "file" in name:
+            return index
+    return None
+
+
 def leaf_column(header: list[str] | None) -> int | None:
     """Index of the column naming a leaf file, from the header row - or None if none names one.
 
@@ -254,14 +265,28 @@ def leaf_column(header: list[str] | None) -> int | None:
     """
     if not header:
         return None
-    names = [header_name(cell) for cell in header]
-    for index, name in enumerate(names):
-        if name in FILE_HEADERS or "leaf" in name or "file" in name:
-            return index
-    for index, name in enumerate(names):
-        if name == "id":
+    column = file_column(header)
+    if column is not None:
+        return column
+    for index, cell in enumerate(header):
+        if header_name(cell) == "id":
             return index
     return None
+
+
+def cannot_index(header: list[str] | None) -> bool:
+    """True when the header names no file column and the only identity it offers is `id`.
+
+    An `id` cell is an identity, never a file name: resolving it as one reports the row's leaf as
+    missing and the leaf as unlisted, two false findings replacing one true fact. Such a table cannot
+    index leaves, and every gate reading it says that once instead of resolving its rows.
+    """
+    return bool(header) and file_column(header) is None and leaf_column(header) is not None
+
+
+def header_text(header: list[str] | None) -> str:
+    """The header row as a reader sees it, for a finding that has to name what it read."""
+    return " | ".join(cell.strip() for cell in header or [])
 
 
 def brief_column(header: list[str] | None, leaf: int) -> int:
@@ -463,6 +488,12 @@ def gate_leaf_index(ctx: Ctx) -> Result:
             if not tables:
                 continue
             scanned += 1
+            blind = [header for header, _ in tables if cannot_index(header)]
+            if blind:
+                findings.append(Finding(gate, ctx.rel(index), None,
+                                        f'no column names a file, so this table cannot index leaves; '
+                                        f'its header is "{header_text(blind[0])}"'))
+                continue
             listed = []
             for header, rows in tables:
                 column = leaf_column(header)
@@ -520,6 +551,8 @@ def gate_shape(ctx: Ctx) -> Result:
         if readme is not None:
             examined += 1
             for header, rows in section_parts(readme.splitlines(), "## Leaves"):
+                if cannot_index(header):
+                    continue
                 column = leaf_column(header)
                 if column is None:
                     column = 1
@@ -627,6 +660,8 @@ def gate_briefs(ctx: Ctx) -> Result:
         lines = (ctx.read(topic.readme) or "").splitlines()
         row_line = {}
         for header, rows in section_parts(lines, "## Leaves"):
+            if cannot_index(header):
+                continue
             column = leaf_column(header)
             if column is None:
                 column = 1
