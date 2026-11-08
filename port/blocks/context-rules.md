@@ -5,11 +5,13 @@
 **You are in `context/`, this repo's memory tree - not a scratch folder.** Before you write anything
 durable, decide where it goes:
 
-- a fact that must load before you know which topic to open → one line in `context/MEMORY.md`
+- a fact that must load before you know which topic to open (what this repo is and how to run it, a
+  convention that spans topics, where an external system lives) → one line in `context/MEMORY.md`
 - a constraint that applies to every topic → one rule in `context/MUST-KNOW.md`
 - a constraint about one area → that topic's `MUST-KNOW.md`
 - a conclusion with its evidence → a new leaf in the topic that owns it
-- a decision, its reason, and what it ruled out → that topic's `decisions.md`
+- a decision, its reason, and what it ruled out → that topic's `decisions.md`; if no topic owns it, create
+  the topic in that same turn, with its register row
 - a procedure → a skill, never a longer note
 - nothing durable → nowhere; do not write it
 

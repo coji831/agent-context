@@ -120,8 +120,9 @@ shell would be two files describing one thing; a single file copied once is smal
    path that is named but absent. Leave `checks_disabled` empty unless you are not wiring the gates at all.
    `skeleton/.gitignore` covers `__pycache__/`: merge it into yours rather than overwriting, and note that
    `cp -r skeleton/scripts` otherwise copies a bytecode cache along with the tool.
-2. **Settle the entry file.** A Claude host: `git mv AGENTS.md CLAUDE.md`. If a present harness reads
-   `AGENTS.md` while `CLAUDE.md` is canonical, copy `port/AGENTS-stub.md` to `AGENTS.md`.
+2. **Settle the entry file.** A Claude host renames it rather than copying it, and the copy must be tracked
+   before it can be renamed: the procedure, including a host with no commit yet, is `ADOPT.md` step 5. If a
+   present harness reads `AGENTS.md` while `CLAUDE.md` is canonical, copy `port/AGENTS-stub.md` to `AGENTS.md`.
 3. **Name the port target** - **the highest-ranked harness present** (§ *The rank*). A declared primary is
    recorded in the host copy and overrides this only on an explicit owner decision.
 4. **Fill the rules.** Replace the `<!-- PORT: context-rules -->` marker in the port target's file with the

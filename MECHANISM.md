@@ -42,7 +42,7 @@ turn makes - is the table at each turn, the only stage that happens inside a tur
 | # | Operation | Trigger | Writes (mutability) | Class |
 | --- | --- | --- | --- | --- |
 | T0 | **route** | owning tree or topic not yet known | nothing; reads entry, `MEMORY.md`, `MUST-KNOW.md`, `INDEX.md` | act; **ask** over two repos |
-| T1 | **start** | work has no owning topic and outlives the request | topic `README.md` **created** + `INDEX.md` row **appended**, same turn and date | act |
+| T1 | **start** | work has no owning topic and either outlives the request or leaves a decision no topic owns | topic `README.md` **created** + `INDEX.md` row **appended**, same turn and date | act |
 | T2 | **wrap-up** | you judge the context will not carry the next step | `HANDOFF.md` **created** or **rewritten whole**; `JOURNEY.md` **appended** | **owner** |
 | T3 | **pick-up** | reached a topic whose `HANDOFF.md` exists | nothing; `## Now` first, `## Failed` not retried | act |
 | T4 | **trim leaves** | a leaf is superseded, duplicated, or decayed to a fact | survivor **rewritten**, other **deleted**, its `## Leaves` row same turn | act; **ask** for another leaf |

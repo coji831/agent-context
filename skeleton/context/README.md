@@ -18,6 +18,7 @@
 | a constraint about one area | that topic's `MUST-KNOW.md` |
 | a conclusion with its evidence | a leaf in the topic that owns it |
 | a decision, its reason, what it ruled out | a leaf in the topic that made it - `decisions.md` |
+| the same, when no topic owns it | the topic is created in that same turn, with its register row - a folder with no row is a finding |
 | a procedure | a skill, not a longer note |
 | nothing durable | nowhere - do not write it |
 
@@ -92,7 +93,9 @@ and the topic README's index repeats both. That is what makes a leaf citable fro
 names an id and never a line number, and checkable when the leaf is rewritten.
 
 `decisions.md` is the one leaf whose **name** is fixed rather than derived from an id; its rows carry the
-ids instead, `D-####`, and a `JOURNEY` entry cites the row it produced. It is not listed in `## Leaves`.
+ids instead, `D-####`, and a `JOURNEY` entry cites the row it produced. That is also why it is not listed in
+`## Leaves`: the leaf table indexes conclusions, not choices, and a choice is cited by its `D-####` row
+rather than by a leaf id.
 
 ## Nesting and naming `[concept]`
 
