@@ -33,7 +33,7 @@ cp <scaffold>/skeleton/context.config.json <repo>/
 ```
 
 `context/` is the one entry that is **always** copied and never merged: it is the memory, and a host that
-already has one is a different job (see the last section). Do **not** copy the entry file here - that is
+already has one does the merge in the last section instead of this copy. Do **not** copy the entry file here - that is
 step 5, because an add-on host already has one and a blind copy would overwrite it.
 
 `scripts/contextctl.py` and `context.config.json` are what make the copy checkable, and they are inert until
@@ -187,9 +187,79 @@ watch the check fail. A check nobody has seen fail is a check nobody should trus
 
 ## If the host already has a `context/`
 
-Stop and say so. Two trees in one repo is not a merge - `CONCEPT.md` value 6: a workspace of several repos is
-several trees, each on its own marker, and knowledge shared across them belongs to a reference the host owns.
-Ask which tree the task should write to, and never promote one repo's note into another's topic.
+This is the state of every long-lived host, and it is a **merge**, not a copy: the published tree supplies
+the shape and the gates, the host supplies the content. Nothing the host wrote to its memory is deleted by
+any step below.
+
+**0. Commit first, or say that the dates are provisional.** `verified` dates a leaf from its last **git
+commit** (`git log -1 --format=%cs -- <leaf>`), never from the working tree, so an uncommitted leaf has no
+history and the gate cannot be honest about it. A dirty tree therefore fails or passes on a fact the commit
+would change. Commit the memory, then run the gates; if you cannot commit, run them anyway and label every
+date finding **provisional** in one line, rather than reporting a clean run you did not earn.
+
+**1. Keep the host's content and the host's own scripts.** Every file under `context/topics/` stays exactly
+where it is - the leaves, `decisions.md`, `HANDOFF.md`, `JOURNEY.md`, the family folders. The host's own
+`scripts/` stay too: `contextctl.py` arrives beside them under its own name, and a host script the config
+no longer names is dormant, not broken.
+
+**2. Let `skeleton/` replace the shape, and only the shape.** `context/README.md` is the **contract** and is
+replaced by the published one - two copies of one document drift, and the one nobody loads is the one that
+gets edited. `context/topics/INDEX.md` is written fresh (the register, split out of whatever file carried
+it). `context/MEMORY.md` and `context/MUST-KNOW.md` are written if absent, by pointing, not by copying the
+skeleton's placeholder: a `- Role: <one line>.` file passes every shape check and migrates nothing. The
+skeleton's `widget/` example and its row are deleted together, at once (step 3). **`.gitignore` is merged,
+never copied**: a blind copy of `skeleton/.gitignore` stops ignoring the directories the host keeps real
+data in.
+
+**3. Translate the config.** The published config knows a smaller set of keys. For each key the host already
+has:
+
+| Host key | What it becomes |
+| --- | --- |
+| `briefing` | **dropped.** This tree ships no renderer and no key may create a briefing; `brief` is a stub that writes nothing. Keep the host's own generator and its file if it has one, but no gate can require it. |
+| `inbox` | **dropped.** Nothing routes to it and no command may create it. |
+| `budget` | **dropped.** There is no document-length budget; per-document caps are `artefacts` entries. |
+| `journey` | **dropped.** `JOURNEY.md` has no shape gate, and the producer contract lived in a `note` command this tool does not ship. |
+| `leaves` | **renamed.** `leaves.max_lines` survives as the leaf line cap. Leaf *naming* is the new **`leaf_pattern`**, and a host that numbers its notes must set it (`"^\\d{2}-"` for `01-scheduler.md`) or every leaf gate measures zero. |
+| `limits` | **dropped.** No gate has that name; leaving it in `checks_advisory` exits 2 on any run other than `--only installed`. |
+| `extra_checks` | **now covered by `extra_checks`.** The published tool takes `"module:function"` strings resolved from the host's own `scripts/`, run under `check --all`. This is where the host's own rules move to, and it is the reason they are not lost. |
+| `artefacts` | **renamed field by field.** The published spec is `{max_lines, max_rules, max_rule_chars, requires, over}` and it **merges over** the defaults; a host shape such as `{role, count, max}` becomes `{"max_lines": 90}`. A glob key (`*-handoff.md`) has no equivalent: declare the exact file names, because a key that matches nothing is silence. |
+| `brief_sections` | **dropped.** Nothing renders a digest to section. |
+| `kb` | **dropped.** No index, no embeddings and no `search`. |
+
+Three path keys do exist and must be **split**: a host that points `memory` and `index_of_topics` at the
+same `context/README.md` gets three separate files instead - `memory`, `root_rules` and `index_of_topics`.
+`FOLDER.md` § *Not in this tree yet* is the list of everything this tree does not carry; read it before
+translating a key rather than after the run reports that the key is unknown.
+
+**4. Merging the entry file is the step that loses something.** The published `skeleton/AGENTS.md` is 664 B
+and the `<!-- context:begin -->` ... `<!-- context:end -->` block inside it is 625 B; the rest is a title.
+So the job is **upsert**, per step 5: append the block to the host's file, or replace only what sits between
+its markers. A host whose entry file is a long routing table keeps every row of it. A blind copy replaces
+the table with 625 B and nothing reports the deleted lines.
+
+**5. Order of operations.** Each step is checkable before the next one starts.
+
+1. Commit the memory, or record that it is dirty (step 0).
+2. Copy `skeleton/scripts/` and `skeleton/context.config.json`; merge `skeleton/.gitignore`.
+3. Replace `context/README.md` with the contract; delete the copied `widget/` example **and** its register row.
+4. Write `context/topics/INDEX.md`: one row per topic folder, dated from each topic's own `Verified:` line.
+5. Write `MEMORY.md` and `MUST-KNOW.md` by pointing at what the host already has (step 4B).
+6. Translate the config with the table above; set `leaf_pattern` to the host's own leaf naming.
+7. Upsert the entry block, then run the upsert a second time and confirm `git diff` is empty.
+8. Install the shells for the harnesses actually present and trim `shells` to them (step 6).
+9. Set `port_target`, then run the checks below.
+
+**6. Verification, and what a green run does not prove.** `check --only installed` must pass - and it now
+survives a config that still names the host's retired gates, printing each one with `note:`, so a stale
+`checks_advisory` no longer hides the install. Then `check --all --warn` and triage every finding into *fix
+now* / *advisory with the reason written down* / *this shape does not exist here*. Three readings matter
+more than the exit code: `leaf-index` must print a **non-zero leaf count** (a zero means `leaf_pattern` is
+wrong, not that the tree has no leaves); `pointers` must print `accepted absent` for the directories the
+clone cannot carry, instead of one finding per citation; and a register row broken on purpose must fail.
+Two trees in one repo root is not a merge - if the host already carries a memory tree from another
+scaffold, decide which one owns `context/` before starting, and never promote one tree's note into the
+other's topic.
 
 ## The failure modes this runbook exists to prevent
 

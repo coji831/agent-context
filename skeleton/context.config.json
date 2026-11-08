@@ -12,6 +12,7 @@
     ".windsurf/rules/context.md"
   ],
   "port_target": null,
+  "accepted_absent": [],
   "checks_disabled": [],
   "checks_advisory": [],
   "extra_checks": [],
@@ -27,5 +28,6 @@
     "MUST-KNOW.md": {"max_rules": 10, "max_rule_chars": 640}
   },
   "leaves": {"max_lines": 120},
+  "leaf_pattern": "^L-\\d{4}",
   "briefs": {"threshold": 0.82}
 }

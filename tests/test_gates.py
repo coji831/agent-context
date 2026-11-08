@@ -233,6 +233,65 @@ class LeafIndex(Base):
         self.assert_fails_with('row names "L-0009-gone.md", no such file', "check")
 
 
+class LeafColumns(Base):
+    """The leaf column is read from the header, never assumed to be the second one.
+
+    A host writes `| Leaf | What it answers |`, and a gate that took `cells[1]` read the *brief* as a
+    file name and the header row itself as a row - two findings per table, neither true.
+    """
+
+    def leaves_section(self, table: str) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n" + table)
+
+    def test_host_column_order(self) -> None:
+        self.leaves_section("| Leaf | What it answers |\n| --- | --- |\n"
+                            "| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_published_column_order(self) -> None:
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_two_columns(self) -> None:
+        self.leaves_section("| id | Leaf |\n| --- | --- |\n"
+                            "| `L-0001` | `L-0001-widget.md` |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_no_header_falls_back_to_the_documented_order(self) -> None:
+        self.leaves_section("| `L-0001` | `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_missing_file_is_still_found_in_the_leaf_column(self) -> None:
+        self.leaves_section("| Leaf | What it answers |\n| --- | --- |\n"
+                            "| `L-0009-gone.md` | a leaf that is not there |\n")
+        self.assert_fails_with('row names "L-0009-gone.md", no such file', "check", "--only", "leaf-index")
+
+    def test_a_prose_table_outside_the_leaves_section_is_ignored(self) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## What this is\n\n"
+                        "| Project | Note |\n| --- | --- |\n| pvl-rentals | ask the client first |\n\n"
+                        "## Leaves\n\n| Leaf | What it answers |\n| --- | --- |\n"
+                        "| `L-0001-widget.md` | what the rig measured |\n")
+        self.assert_passes("check", "--only", "leaf-index", "--only", "shape")
+
+    def test_a_family_index_is_the_first_table_naming_a_file(self) -> None:
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n> written during the work.\n\n"
+                        "| Phase | State |\n| --- | --- |\n| one | done |\n\n"
+                        "| id | Leaf | Brief - what it answers |\n| --- | --- | --- |\n"
+                        "| `L-0002` | `L-0002-plan.md` | the order of the phases |\n")
+        self.tree.write("context/topics/widget/plan/L-0002-plan.md",
+                        "---\nid: L-0002\nbrief: the order of the phases\n---\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+    def test_a_family_without_a_leaf_table_contributes_nothing(self) -> None:
+        self.tree.write("context/topics/widget/plan/README.md",
+                        "# plan/\n\n| Phase | State |\n| --- | --- |\n| one | done |\n")
+        self.tree.write("context/topics/widget/plan/L-0002-plan.md",
+                        "---\nid: L-0002\nbrief: the order of the phases\n---\n")
+        self.assert_passes("check", "--only", "leaf-index")
+
+
 class Shape(Base):
     def test_leaf_without_brief(self) -> None:
         self.tree.write("context/topics/widget/L-0001-widget.md", "---\nid: L-0001\n---\nbody\n")
@@ -296,6 +355,50 @@ class Pointers(Base):
     def test_bare_names_are_prose(self) -> None:
         self.tree.append("context/MEMORY.md", "\n- see `HANDOFF.md` and `docs/` when in doubt\n")
         self.assert_passes("check", "--all")
+
+
+class AcceptedAbsent(Base):
+    """A gitignored directory and a home-relative path are permanent false findings without a list.
+
+    The host this was measured on carries `repos/` and `state/` for real, `/`-anchored in `.gitignore`
+    and so absent from every clone, plus two `~/` citations; the retired checker it replaced accepted
+    32 entries and its summary printed how many it had accepted.
+    """
+
+    def cite(self, token: str) -> None:
+        self.tree.append("context/MEMORY.md", "\n- see `" + token + "` for it\n")
+
+    def configured(self, entries: list[str]) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "accepted_absent": entries})
+
+    def test_a_prefix_entry_accepts_and_is_counted(self) -> None:
+        self.configured(["repos/"])
+        self.cite("repos/pvl-rentals/README.md")
+        code, out = self.tree.run("check", "--only", "pointers")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 accepted absent", out)
+
+    def test_a_glob_entry_accepts(self) -> None:
+        self.configured(["reports/qa-*.md"])
+        self.cite("reports/qa-2026-11.md")
+        self.assert_passes("check", "--only", "pointers")
+
+    def test_a_home_relative_path_needs_no_config(self) -> None:
+        self.cite("~/.copilot/instructions/terminal-command-safety.instructions.md")
+        self.cite("$HOME/.copilot/agents/reviewer.md")
+        code, out = self.tree.run("check", "--only", "pointers")
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 accepted absent", out)
+
+    def test_a_citation_outside_the_list_still_fails(self) -> None:
+        self.configured(["repos/"])
+        self.cite("docs/runbook.md")
+        self.assert_fails_with('"docs/runbook.md" does not resolve', "check", "--only", "pointers")
+
+    def test_an_entry_that_matches_nothing_is_a_finding(self) -> None:
+        self.configured(["repos/"])
+        self.assert_fails_with('accepted_absent entry "repos/" matched no citation',
+                               "check", "--only", "pointers")
 
 
 class Installed(Base):
@@ -398,6 +501,46 @@ class ShippedWorkflows(unittest.TestCase):
                          f"only {checked} of {len(self.WORKFLOWS)} shipped workflows were read")
 
 
+class LeafPattern(Base):
+    """Leaf naming is a config value: a host that numbers its notes `01-name.md` had no leaves at all.
+
+    Measured on the real host: `L-####-*.md` = 0, `NN-*.md` = 87, and `verified` printed
+    `ok 11 dated topics, 0 leaves without history` - a green gate over an empty set.
+    """
+
+    def numbered(self) -> None:
+        (self.tree.root / "context/topics/widget/L-0001-widget.md").unlink()
+        self.tree.write("context/topics/widget/01-scheduler.md",
+                        "---\nid: 01-scheduler\nbrief: what the batch size measured\n---\n")
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nVerified: {today}\n\n## Leaves\n\n| Leaf | What it answers |\n"
+                        "| --- | --- |\n| `01-scheduler.md` | what the batch size measured |\n")
+        self.tree.git()
+
+    def test_the_default_pattern_is_unchanged(self) -> None:
+        self.assert_passes("check", "--all")
+
+    def test_a_configured_pattern_finds_the_hosts_leaves(self) -> None:
+        self.numbered()
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "^\\d{2}-"})
+        code, out = self.tree.run("check", "--only", "leaf-index", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 topics, 1 leaves", out)
+
+    def test_nothing_matching_the_pattern_is_reported(self) -> None:
+        self.numbered()
+        code, out = self.tree.run("check", "--only", "verified")
+        self.assertEqual(code, 0, out)
+        self.assertIn('leaf_pattern "^L-\\d{4}" matches none of', out)
+        self.assertIn("the leaf gates checked nothing", out)
+
+    def test_a_broken_pattern_is_a_config_error(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "leaf_pattern": "("})
+        code, out = self.tree.run("check", "--only", "verified")
+        self.assertEqual(code, 2, out)
+        self.assertIn("not a valid regular expression", out)
+
+
 class Verified(Base):
     def test_stale_date(self) -> None:
         readme = self.tree.read("context/topics/widget/README.md").replace(TODAY, "2020-01-01")
@@ -482,6 +625,117 @@ class Archive(Base):
         self.assertEqual(code, 1, out)
         self.assertIn("context/topics/archive: folder has no row", out)
         self.assertIn("context/topics/archive: topic has no README.md", out)
+
+
+class ExtraChecks(Base):
+    """A host attaches its own rules through `extra_checks`; the published tool rejected the key outright.
+
+    Measured on the real host: three unique rules (`shell_checks:refs`, `:one_home`, `:briefing_current`)
+    were refused as gate names, so the coverage its retired checker was retired *into* became unreachable.
+    """
+
+    def module(self, source: str) -> None:
+        path = self.tree.root / "scripts" / "host_checks.py"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
+
+    def configured(self, *specs: str) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "extra_checks": list(specs)})
+
+    def test_a_host_check_reports_under_its_own_name(self) -> None:
+        self.module('def policy(root, cfg):\n'
+                    '    return [{"message": "policy.md is missing", "rel": "docs/policy.md", "line": 3}]\n')
+        self.configured("host_checks:policy")
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 1, out)
+        self.assertIn("extra:host_checks.policy", out)
+        self.assertIn("docs/policy.md:3: policy.md is missing", out)
+
+    def test_plain_strings_are_accepted(self) -> None:
+        self.module('def shallow(root, cfg):\n    return ["a plain sentence"]\n')
+        self.configured("host_checks:shallow")
+        self.assert_fails_with("a plain sentence", "check", "--all")
+
+    def test_a_clean_check_raises_the_denominator(self) -> None:
+        self.module('def clean(root, cfg):\n    return []\n')
+        self.configured("host_checks:clean")
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 0, out)
+        self.assertIn("extra:host_checks.clean", out)
+        self.assertIn("10 of 10 gates ran", out)
+
+    def test_it_runs_only_with_all(self) -> None:
+        self.module('def clean(root, cfg):\n    return ["should not run"]\n')
+        self.configured("host_checks:clean")
+        code, out = self.tree.run("check")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("extra:", out)
+        self.assertIn("5 of 9 gates ran", out)
+
+    def test_zero_extras_keeps_the_denominator(self) -> None:
+        self.configured()
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 0, out)
+        self.assertIn("9 of 9 gates ran", out)
+
+    def test_a_missing_module_is_a_finding_not_a_traceback(self) -> None:
+        self.configured("nowhere:policy")
+        self.assert_fails_with('no "nowhere" module under scripts/', "check", "--all")
+
+    def test_a_missing_function_is_a_finding(self) -> None:
+        self.module('def other(root, cfg):\n    return []\n')
+        self.configured("host_checks:policy")
+        self.assert_fails_with('has no callable "policy"', "check", "--all")
+
+    def test_a_raising_function_is_a_finding(self) -> None:
+        self.module('def boom(root, cfg):\n    raise ValueError("spec broke")\n')
+        self.configured("host_checks:boom")
+        self.assert_fails_with("raised ValueError: spec broke", "check", "--all")
+
+    def test_a_spec_without_a_function_is_a_config_error(self) -> None:
+        self.configured("host_checks")
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 2, out)
+        self.assertIn('is not "module:function"', out)
+
+
+class InstallProof(Base):
+    """`check --only installed` is the runbook's install proof, so a legacy config may not preempt it.
+
+    Measured on the real host: seven `is not a gate this tool has` errors and exit 2 for `--all` **and**
+    for `--only installed` - the command ADOPT step 6 tells an adopter to run.
+    """
+
+    def legacy(self) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"],
+                          "checks_advisory": ["budget", "journey"],
+                          "checks_disabled": ["leaves"],
+                          "extra_checks": ["shell_checks:refs"]})
+
+    def test_only_installed_runs_despite_unknown_names(self) -> None:
+        self.legacy()
+        code, out = self.tree.run("check", "--only", "installed")
+        self.assertEqual(code, 0, out)
+        self.assertIn("installed    ok", out)
+
+    def test_the_ignored_names_are_printed_not_swallowed(self) -> None:
+        self.legacy()
+        code, out = self.tree.run("check", "--only", "installed")
+        self.assertEqual(code, 0, out)
+        self.assertIn("note:", out)
+        self.assertIn('"budget" is not a gate this tool has', out)
+
+    def test_any_other_invocation_keeps_todays_strictness(self) -> None:
+        self.legacy()
+        code, out = self.tree.run("check")
+        self.assertEqual(code, 2, out)
+        self.assertIn("error:", out)
+
+    def test_a_bom_encoded_config_is_read(self) -> None:
+        path = self.tree.root / "context.config.json"
+        payload = {"shells": [".claude/rules/context.md"]}
+        path.write_bytes(b"\xef\xbb\xbf" + json.dumps(payload).encode("utf-8"))
+        self.assert_passes("check")
 
 
 class Cli(Base):

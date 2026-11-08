@@ -16,6 +16,9 @@ Exit codes: 0 no blocking finding, 1 blocking findings, 2 usage or config error.
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import importlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -28,7 +31,7 @@ from pathlib import Path
 FAN_OUT = 10
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 VERIFIED_RE = re.compile(r"(?m)^\s*Verified:\s*(\d{4}-\d{2}-\d{2})")
-LEAF_FILE = re.compile(r"^(L-\d{4})-")
+LEAF_PATTERN = r"^L-\d{4}"
 DECISION_RE = re.compile(r"^D-\d{4}$")
 RULE_START = re.compile(r"^(?:[-*+]|\d+\.)\s+\S")
 BACKTICK = re.compile(r"`([^`\n]+)`")
@@ -46,10 +49,12 @@ DEFAULTS = {
     "entry_file": "AGENTS.md",
     "shells": [],
     "port_target": None,
+    "accepted_absent": [],
     "checks_disabled": [],
     "checks_advisory": [],
     "extra_checks": [],
     "leaves": {"max_lines": 120},
+    "leaf_pattern": LEAF_PATTERN,
     "briefs": {"threshold": 0.82},
     "artefacts": {
         "README.md": {"max_lines": 80,
@@ -91,16 +96,26 @@ def known_names() -> list[str]:
 def load_config(root: Path, explicit: str | None) -> tuple[dict, list[str]]:
     """Return the merged config and any complaint about a name it mentions."""
     path = Path(explicit) if explicit else root / "context.config.json"
-    raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    # utf-8-sig, not utf-8: Windows PowerShell 5.1's `Set-Content -Encoding utf8` writes a BOM, and a
+    # config that cannot be read is an install that cannot be proven.
+    raw = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
     cfg = merge(DEFAULTS, raw)
     for key in ("artefacts", "root_artefacts"):
         cfg[key] = {name: spec for name, spec in cfg[key].items() if spec is not None}
     problems = []
+    try:
+        re.compile(str(cfg["leaf_pattern"]))
+    except re.error as error:
+        problems.append(f'leaf_pattern "{cfg["leaf_pattern"]}" is not a valid regular expression: {error}')
     known = set(known_names())
-    for key in ("checks_disabled", "checks_advisory", "extra_checks"):
+    for key in ("checks_disabled", "checks_advisory"):
         for name in cfg.get(key) or []:
             if name not in known:
                 problems.append(f'{key}: "{name}" is not a gate this tool has')
+    for spec in cfg.get("extra_checks") or []:
+        module_name, _, function_name = str(spec).partition(":")
+        if not module_name.strip() or not function_name.strip():
+            problems.append(f'extra_checks: "{spec}" is not "module:function"')
     return cfg, problems
 
 
@@ -113,6 +128,7 @@ class Finding:
     path: str
     line: int | None
     message: str
+    advisory: bool = False
 
     def render(self) -> str:
         where = self.path if self.line is None else f"{self.path}:{self.line}"
@@ -145,24 +161,64 @@ class Topic:
     families: list[Path] = field(default_factory=list)
 
 
+SEPARATOR_CELL = re.compile(r"^:?-{2,}:?$")
+HEADER_WORDS = ("id", "topic", "what", "leaf")
+FILE_HEADERS = ("leaf", "leaves", "file", "files", "filename")
+BRIEF_HEADERS = ("what", "what it answers", "answers")
+
+
+def split_row(text: str) -> list[str]:
+    return [cell.strip() for cell in text.strip().strip("|").split("|")]
+
+
+def is_separator(cells: list[str]) -> bool:
+    filled = [cell for cell in cells if cell]
+    return bool(filled) and all(SEPARATOR_CELL.match(cell) for cell in filled)
+
+
+def is_header_word(cells: list[str]) -> bool:
+    return bool(cells) and cells[0].strip("`").strip().lower() in HEADER_WORDS
+
+
+def row_lines(lines: list[str]) -> list[tuple[int, list[str]]]:
+    return [(number, split_row(raw.strip())) for number, raw in enumerate(lines, 1)
+            if raw.strip().startswith("|")]
+
+
+def table_parts(lines: list[str],
+                offset: int = 0) -> list[tuple[list[str] | None, list[tuple[int, list[str]]]]]:
+    """Every markdown table as (header cells or None, body rows with real line numbers).
+
+    A header is the row-line a separator line follows - the markdown definition - so the header's
+    column names are available to the caller and the header itself is never a body row. A run of rows
+    with no separator anywhere is one headerless table: there is no column name to read, and a caller
+    falls back to the documented column order rather than inventing one.
+    """
+    lines_of = row_lines(lines)
+    starts = [index for index in range(len(lines_of) - 1)
+              if is_separator(lines_of[index + 1][1]) and not is_separator(lines_of[index][1])]
+    if not starts:
+        rows = [(number + offset, cells) for number, cells in lines_of
+                if not is_separator(cells) and not is_header_word(cells)]
+        return [(None, rows)]
+    tables = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(lines_of)
+        header = lines_of[start][1]
+        rows = [(number + offset, cells) for number, cells in lines_of[start + 1:end]
+                if not is_separator(cells)]
+        tables.append((header, rows))
+    return tables
+
+
 def table_rows(lines: list[str]) -> list[tuple[int, list[str]]]:
     """Body rows of every markdown table; header and separator lines dropped."""
-    rows = []
-    for number, raw in enumerate(lines, 1):
-        text = raw.strip()
-        if not text.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in text.strip("|").split("|")]
-        if all(re.fullmatch(r":?-{2,}:?", cell) for cell in cells if cell):
-            continue
-        if cells and cells[0].strip("`").lower() in ("id", "topic", "what"):
-            continue
-        rows.append((number, cells))
-    return rows
+    return [row for _, rows in table_parts(lines) for row in rows]
 
 
-def section_rows(lines: list[str], heading: str) -> list[tuple[int, list[str]]]:
-    """Body rows of the table inside one `## heading`, with real line numbers."""
+def section_parts(lines: list[str],
+                  heading: str) -> list[tuple[list[str] | None, list[tuple[int, list[str]]]]]:
+    """Every table inside one `## heading`, with real line numbers."""
     start = None
     for index, raw in enumerate(lines):
         match = HEADING.match(raw)
@@ -176,8 +232,45 @@ def section_rows(lines: list[str], heading: str) -> list[tuple[int, list[str]]]:
         if HEADING.match(lines[index]):
             end = index
             break
-    offset = start
-    return [(number + offset, cells) for number, cells in table_rows(lines[start:end])]
+    return table_parts(lines[start:end], offset=start)
+
+
+def section_rows(lines: list[str], heading: str) -> list[tuple[int, list[str]]]:
+    """Body rows of the tables inside one `## heading`, with real line numbers."""
+    return [row for _, rows in section_parts(lines, heading) for row in rows]
+
+
+def header_name(cell: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", cell.strip().strip("`").lower())).strip()
+
+
+def leaf_column(header: list[str] | None) -> int | None:
+    """Index of the column naming a leaf file, from the header row - or None if none names one.
+
+    `Leaf`, `Leaves`, `File` and any header containing one of those words win over `id`, because the
+    row's *file name* is what the gate resolves: `| id | Leaf | Brief |` puts the id first and the file
+    second, and reading the id as the file reports a leaf as missing. `id` is used only when no column
+    names a file.
+    """
+    if not header:
+        return None
+    names = [header_name(cell) for cell in header]
+    for index, name in enumerate(names):
+        if name in FILE_HEADERS or "leaf" in name or "file" in name:
+            return index
+    for index, name in enumerate(names):
+        if name == "id":
+            return index
+    return None
+
+
+def brief_column(header: list[str] | None, leaf: int) -> int:
+    """Index of the column saying what the leaf answers; the one after the leaf when it is unlabelled."""
+    for index, cell in enumerate(header or []):
+        name = header_name(cell)
+        if "brief" in name or name in BRIEF_HEADERS:
+            return index
+    return leaf + 1
 
 
 def rule_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
@@ -218,6 +311,9 @@ class Ctx:
         self.cfg = cfg
         self.tree_root = (root / cfg["memory"]).parent
         self.topics_dir = root / cfg["topics_dir"]
+        # Compiled once, in one place: every gate that asks "is this a leaf" asks this pattern.
+        self.leaf_file = re.compile(str(cfg["leaf_pattern"]))
+        self._leaf_warned = False
         self.topics = self._topics()
         self.leaves = self._leaves()
 
@@ -234,13 +330,32 @@ class Ctx:
 
     def _leaves(self) -> list[Leaf]:
         leaves = []
-        for path in sorted(self.topics_dir.rglob("L-*.md")):
-            if not LEAF_FILE.match(path.name):
+        for path in sorted(self.topics_dir.rglob("*.md")):
+            if not self.leaf_file.match(path.name):
                 continue
             text = self.read(path) or ""
             ident, brief = parse_leaf(text)
             leaves.append(Leaf(path, self.rel(path), ident, brief, text.splitlines()))
         return leaves
+
+    def leaf_warning(self) -> Finding | None:
+        """The liveness finding, reported once per run by the first leaf gate that asks.
+
+        A tree of numbered notes under the default `^L-\\d{4}` has no leaves at all, and the leaf gates
+        then measure nothing while printing `ok`. Advisory, not blocking: a fully drained tree is
+        legitimately leaf-free, and failing a correct drain teaches an operator to switch a gate off.
+        """
+        if self._leaf_warned:
+            return None
+        self._leaf_warned = True
+        if not self.topics_dir.is_dir() or self.leaves:
+            return None
+        files = [path for path in self.topics_dir.rglob("*") if path.is_file()]
+        if not files:
+            return None
+        return Finding("", self.rel(self.topics_dir), None,
+                       f'leaf_pattern "{self.cfg["leaf_pattern"]}" matches none of {len(files)} files '
+                       f'under {self.rel(self.topics_dir)}; the leaf gates checked nothing', advisory=True)
 
     def rel(self, path: Path) -> str:
         try:
@@ -336,29 +451,45 @@ def gate_leaf_index(ctx: Ctx) -> Result:
             continue
         indexes = [topic.readme] + [family / "README.md" for family in topic.families]
         for index in indexes:
-            scanned += 1
             lines = (ctx.read(index) or "").splitlines()
-            rows = section_rows(lines, "## Leaves") if index == topic.readme else table_rows(lines)
+            if index == topic.readme:
+                tables = section_parts(lines, "## Leaves") or [(None, [])]
+            else:
+                tables = []
+                for header, rows in table_parts(lines):
+                    if leaf_column(header) is not None:
+                        tables = [(header, rows)]
+                        break
+            if not tables:
+                continue
+            scanned += 1
             listed = []
-            for number, cells in rows:
-                if len(cells) < 2:
-                    continue
-                leaf_name = cells[1].strip("`").strip()
-                listed.append(leaf_name)
-                if not (index.parent / leaf_name).exists():
-                    findings.append(Finding(gate, ctx.rel(index), number,
-                                            f'row names "{leaf_name}", no such file'))
+            for header, rows in tables:
+                column = leaf_column(header)
+                if column is None:
+                    column = 1
+                for number, cells in rows:
+                    if len(cells) <= column:
+                        continue
+                    leaf_name = cells[column].strip("`").strip()
+                    listed.append(leaf_name)
+                    if not (index.parent / leaf_name).exists():
+                        findings.append(Finding(gate, ctx.rel(index), number,
+                                                f'row names "{leaf_name}", no such file'))
             for leaf in ctx.leaves:
                 if leaf.path.parent == index.parent and leaf.path.name not in listed:
                     findings.append(Finding(gate, leaf.rel, None, f"no row in {ctx.rel(index)}"))
         for family in sorted(p for p in topic.dir.iterdir() if p.is_dir()):
-            owned = [p for p in family.glob("L-*.md") if LEAF_FILE.match(p.name)]
+            owned = [p for p in family.glob("*.md") if ctx.leaf_file.match(p.name)]
             if owned and not (family / "README.md").exists():
                 for leaf in owned:
                     findings.append(Finding(gate, ctx.rel(leaf), None,
                                             f"leaf sits in {ctx.rel(family)}/, which has no README.md"))
     if scanned == 0:
         return zero(gate, ctx.rel(ctx.topics_dir), "topic READMEs", ctx.topics_dir.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, scanned, f"{len(ctx.topics)} topics, {len(ctx.leaves)} leaves")
 
 
@@ -368,13 +499,13 @@ def gate_shape(ctx: Ctx) -> Result:
     examined = 0
     for leaf in ctx.leaves:
         examined += 1
-        match = LEAF_FILE.match(leaf.path.name)
+        match = ctx.leaf_file.match(leaf.path.name)
         if not leaf.id:
             findings.append(Finding(gate, leaf.rel, 1,
                                     "no `id: L-####` in the frontmatter or the first two lines"))
-        elif match and leaf.id != match.group(1):
+        elif match and leaf.id != match.group(0) and leaf.id != leaf.path.stem:
             findings.append(Finding(gate, leaf.rel, 1,
-                                    f"id {leaf.id} does not match the file name ({match.group(1)})"))
+                                    f"id {leaf.id} does not match the file name ({match.group(0)})"))
         if not leaf.brief:
             findings.append(Finding(gate, leaf.rel, 2,
                                     "no `brief:`; the index cannot say what this leaf answers"))
@@ -388,8 +519,14 @@ def gate_shape(ctx: Ctx) -> Result:
         readme = ctx.read(topic.readme)
         if readme is not None:
             examined += 1
-            for number, cells in section_rows(readme.splitlines(), "## Leaves"):
-                if len(cells) < 3 or not cells[2].strip("`").strip():
+            for header, rows in section_parts(readme.splitlines(), "## Leaves"):
+                column = leaf_column(header)
+                if column is None:
+                    column = 1
+                brief = brief_column(header, column)
+                for number, cells in rows:
+                    if len(cells) <= brief or cells[brief].strip("`").strip():
+                        continue
                     findings.append(Finding(gate, ctx.rel(topic.readme), number,
                                             "leaf row has no brief; the table exists so the leaf stays shut"))
         decisions = topic.dir / "decisions.md"
@@ -422,6 +559,9 @@ def gate_shape(ctx: Ctx) -> Result:
                                         f'row has no date ({when or "empty"}); expected YYYY-MM-DD'))
     if examined == 0:
         return zero(gate, ctx.rel(ctx.tree_root), "files", ctx.tree_root.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, examined, f"{examined} files")
 
 
@@ -472,6 +612,9 @@ def gate_caps(ctx: Ctx) -> Result:
         check(ctx.tree_root / name, spec)
     if examined == 0:
         return zero(gate, ctx.rel(ctx.tree_root), "artefacts", ctx.tree_root.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, examined, f"{examined} artefacts")
 
 
@@ -483,9 +626,13 @@ def gate_briefs(ctx: Ctx) -> Result:
     for topic in ctx.topics:
         lines = (ctx.read(topic.readme) or "").splitlines()
         row_line = {}
-        for number, cells in section_rows(lines, "## Leaves"):
-            if len(cells) >= 2:
-                row_line[cells[1].strip("`").strip()] = number
+        for header, rows in section_parts(lines, "## Leaves"):
+            column = leaf_column(header)
+            if column is None:
+                column = 1
+            for number, cells in rows:
+                if len(cells) > column:
+                    row_line[cells[column].strip("`").strip()] = number
         own = [leaf for leaf in ctx.topics_of(topic) if leaf.brief]
         briefs += len(own)
         for index, first in enumerate(own):
@@ -500,6 +647,9 @@ def gate_briefs(ctx: Ctx) -> Result:
                                         f"{first.id or first.path.stem}; one conclusion, two leaves?"))
     if not ctx.topics:
         return zero(gate, ctx.rel(ctx.topics_dir), "topics", ctx.topics_dir.is_dir())
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, len(ctx.topics), f"{briefs} briefs in {len(ctx.topics)} topics")
 
 
@@ -542,6 +692,9 @@ def gate_verified(ctx: Ctx) -> Result:
     if findings == [] and undated and undated == len(ctx.leaves):
         findings.append(Finding(gate, ctx.rel(ctx.tree_root), None,
                                 f"git history unavailable for all {undated} leaves, so no date was checked"))
+    stale = ctx.leaf_warning()
+    if stale is not None:
+        findings.append(stale)
     return Result(gate, findings, scanned, f"{scanned} dated topics, {undated} leaves without history")
 
 
@@ -563,10 +716,21 @@ def resolves(ctx: Ctx, source: Path, token: str) -> bool:
     return any((base / token).exists() for base in bases)
 
 
+def accepts_absent(entry: str, token: str) -> bool:
+    """A citation matches an `accepted_absent` entry as an exact path, a prefix, or a glob."""
+    prefix = entry.rstrip("/")
+    if token in (entry, prefix) or token.startswith(prefix + "/"):
+        return True
+    return fnmatch.fnmatchcase(token, entry)
+
+
 def gate_pointers(ctx: Ctx) -> Result:
     gate = "pointers"
     findings = []
     tokens = 0
+    accepted = 0
+    entries = [str(entry) for entry in ctx.cfg.get("accepted_absent") or []]
+    used: set[str] = set()
     files = [ctx.root / ctx.cfg["memory"], ctx.root / ctx.cfg["root_rules"],
              ctx.root / ctx.cfg["entry_file"]] + [topic.readme for topic in ctx.topics]
     for path in files:
@@ -578,11 +742,27 @@ def gate_pointers(ctx: Ctx) -> Result:
                 if not path_like(token):
                     continue
                 tokens += 1
+                clean = token.strip().strip("`").split("#")[0]
+                if clean.startswith(("~/", "$HOME/")):
+                    accepted += 1
+                    continue
+                hit = next((entry for entry in entries if accepts_absent(entry, clean)), None)
+                if hit is not None:
+                    used.add(hit)
+                    accepted += 1
+                    continue
                 if not resolves(ctx, path, token):
                     findings.append(Finding(gate, ctx.rel(path), number, f'"{token}" does not resolve'))
+    for entry in entries:
+        if entry not in used:
+            findings.append(Finding(gate, "context.config.json", None,
+                                    f'accepted_absent entry "{entry}" matched no citation'))
     if tokens == 0:
         return zero(gate, ctx.rel(ctx.tree_root), "cited paths", ctx.tree_root.is_dir())
-    return Result(gate, findings, tokens, f"{tokens} cited paths in {len(files)} files")
+    detail = f"{tokens} cited paths in {len(files)} files"
+    if accepted:
+        detail += f", {accepted} accepted absent"
+    return Result(gate, findings, tokens, detail)
 
 
 def gate_ported(ctx: Ctx) -> Result:
@@ -644,6 +824,72 @@ CHECKS = [
     ("ported", gate_ported, "opt-in"),
 ]
 GATES = {name: fn for name, fn, _ in CHECKS}
+
+
+# ------------------------------------------------------------------- a host's own checks
+
+
+def resolve_extra(root: Path, spec: str) -> tuple[object | None, str]:
+    """(callable, "") from `<root>/scripts/<module>.py`, or (None, the reason it is unusable).
+
+    A host's module is not this tool's to trust: an import that raises, a function that is absent and a
+    function that raises all become findings. A traceback-and-exit would take the green run with it, and
+    an adopter would learn to delete the check instead of fixing it.
+    """
+    module_name, _, function_name = spec.partition(":")
+    scripts = root / "scripts"
+    path = scripts / (module_name.replace(".", "/") + ".py")
+    if not path.is_file():
+        return None, f'no "{module_name}" module under scripts/'
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    try:
+        loader = importlib.util.spec_from_file_location(f"contextctl_extra_{module_name}", path)
+        module = importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(module)
+    except Exception as error:  # a host module may import anything, and fail
+        return None, f'importing "{module_name}" raised {type(error).__name__}: {error}'
+    function = getattr(module, function_name, None)
+    if not callable(function):
+        return None, f'"{module_name}" has no callable "{function_name}"'
+    return function, ""
+
+
+def extra_finding(gate: str, item, where: str) -> Finding:
+    """A host's finding: a dict with `message` and optional `rel` and `line`, or a plain string."""
+    if isinstance(item, str):
+        return Finding(gate, where, None, item)
+    if isinstance(item, dict):
+        line = item.get("line")
+        try:
+            line = int(line) if line is not None else None
+        except (TypeError, ValueError):
+            line = None
+        return Finding(gate, str(item.get("rel") or where), line, str(item.get("message") or item))
+    return Finding(gate, where, None,
+                   f'returned {type(item).__name__} {item!r}; a finding is a dict with a message or a string')
+
+
+def gate_extra(ctx: Ctx, spec: str) -> Result:
+    module_name, _, function_name = spec.partition(":")
+    gate = f"extra:{module_name}.{function_name}"
+    where = ctx.rel(ctx.root / "scripts" / (module_name.replace(".", "/") + ".py"))
+    function, problem = resolve_extra(ctx.root, spec)
+    if function is None:
+        return Result(gate, [Finding(gate, where, None, problem)], 0, "not run")
+    try:
+        value = function(ctx.root, ctx.cfg)
+    except Exception as error:  # a host check failing is a finding, not the end of the run
+        return Result(gate, [Finding(gate, where, None,
+                                     f"{function_name} raised {type(error).__name__}: {error}")],
+                      0, "raised")
+    if isinstance(value, (str, bytes)) or not isinstance(value, list):
+        return Result(gate, [Finding(gate, where, None,
+                                     f"returned {type(value).__name__}; expected a list of findings")],
+                      0, "not a list")
+    findings = [extra_finding(gate, item, where) for item in value]
+    noun = "finding" if len(value) == 1 else "findings"
+    return Result(gate, findings, len(value), f"{len(value)} {noun} from {module_name}.py")
 
 
 # ---------------------------------------------------------------------------- cli
@@ -711,11 +957,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f'error: unknown gate(s): {", ".join(unknown)}', file=sys.stderr)
         print(f"known gates: {', '.join(known_names())}", file=sys.stderr)
         return 2
+    # `--only installed` is the install proof ADOPT tells an adopter to run, and it consults no list the
+    # problems can name: a host's legacy config must not preempt it. Any other invocation stays strict.
+    install_proof = bool(args.only) and set(args.only) == {"installed"} and not args.skip
     if problems:
-        for line in problems:
-            print(f"error: {line}", file=sys.stderr)
-        print(f"known gates: {', '.join(known_names())}", file=sys.stderr)
-        return 2
+        if install_proof:
+            for line in problems:
+                print(f"note: {line} (ignored: --only installed never consults it)", file=sys.stderr)
+        else:
+            for line in problems:
+                print(f"error: {line}", file=sys.stderr)
+            print(f"known gates: {', '.join(known_names())}", file=sys.stderr)
+            return 2
 
     try:
         chosen, disabled = select(cfg, args)
@@ -728,25 +981,35 @@ def main(argv: list[str] | None = None) -> int:
     results: list[Result] = []
     blocking = 0
     advisory_findings = 0
-    for name in chosen:
-        result = GATES[name](ctx) if name in GATES else gate_installed(ctx)
-        result.advisory = bool(args.warn) or name in advisory
-        if result.findings:
-            if result.advisory:
-                advisory_findings += len(result.findings)
-            else:
-                blocking += len(result.findings)
+
+    def record(result: Result, forced: bool) -> None:
+        nonlocal blocking, advisory_findings
+        blocking_findings = [] if forced else [f for f in result.findings if not f.advisory]
+        result.advisory = forced or (bool(result.findings) and not blocking_findings)
+        blocking += len(blocking_findings)
+        advisory_findings += len(result.findings) - len(blocking_findings)
         results.append(result)
+
+    for name in chosen:
+        record(GATES[name](ctx) if name in GATES else gate_installed(ctx),
+               bool(args.warn) or name in advisory)
+    # A host's own checks are opt-in like the four opt-in gates: `--all` runs them, nothing else does,
+    # so a tree with no `extra_checks` still prints the same denominator it always printed.
+    extras = list(cfg.get("extra_checks") or []) if args.all else []
+    for spec in extras:
+        record(gate_extra(ctx, str(spec)), bool(args.warn))
 
     if args.json:
         payload = {
             "root": root.as_posix(),
             "gates": [{"gate": result.gate,
-                       "status": "ok" if not result.findings else "fail",
+                       "status": ("ok" if not result.findings
+                                  else ("warn" if result.advisory else "fail")),
                        "advisory": result.advisory,
                        "subjects": result.count,
                        "detail": result.detail,
-                       "findings": [{"path": f.path, "line": f.line, "message": f.message}
+                       "findings": [{"path": f.path, "line": f.line, "message": f.message,
+                                     "advisory": f.advisory}
                                     for f in result.findings]}
                       for result in results],
             "blocking": blocking,
@@ -763,7 +1026,7 @@ def main(argv: list[str] | None = None) -> int:
         for finding in result.findings:
             print(finding.render())
     noun = "finding" if blocking == 1 else "findings"
-    ran_text = f"{len(results)} of {len(known_names())} gates ran"
+    ran_text = f"{len(results)} of {len(known_names()) + len(extras)} gates ran"
     print(f"{blocking} blocking {noun}; {ran_text}; "
           f"{advisory_findings} advisory; disabled: {', '.join(disabled) if disabled else 'none'}")
     return 1 if blocking else 0
