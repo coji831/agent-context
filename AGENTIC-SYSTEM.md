@@ -74,16 +74,31 @@ neither helps - there is no start file to scope and no event to hang a hook on.
 ## 2. Per harness: the file that must exist
 
 **The paths move; the shape does not.** Each path below is either re-verified against
-the vendor's own documentation on 2026-11-07, or marked unverified - nothing is asserted and then hidden.
+the vendor's own documentation, fetched 2026-11-08 and listed under the table, or marked unverified - nothing
+is asserted and then hidden.
 
 | Harness | File that must exist | Where | Path-scoped rules | Silently, without it | Verified |
 | --- | --- | --- | --- | --- | --- |
-| VS Code / Copilot | `AGENTS.md` (nearest in the directory tree wins), or `.github/copilot-instructions.md` | repo root / `.github/` | `*.instructions.md` with `applyTo` frontmatter, in or below `.github/instructions/` | the session never learns `context/` exists: it answers from the chat, writes nothing, and reports no error | 2026-11-07, GitHub Copilot docs |
-| Claude Code | `CLAUDE.md`, or `AGENTS.md`, which Claude Code reads **in place of** it | repo root; also a user-level home | `.claude/rules/` - the glob key is **unverified** | it starts from an empty window with nothing pointing at the tree, and every session re-derives what the last one knew | 2026-11-07, Claude Code docs |
-| Cursor | `AGENTS.md`, or `.cursor/rules/*.mdc` - a plain `.md` there is **ignored**, having no frontmatter | `.cursor/rules/` | the `.mdc` frontmatter: `globs` (apply-to-files) or `description` (apply-intelligently) | a rule written at a plausible path is never loaded, because Agent reads only what it recognises - the file looks installed and is inert | 2026-11-07, Cursor docs |
-| Codex / CLI agents | `AGENTS.md`, concatenated root-downward, one per directory, capped at `project_doc_max_bytes` (32 KiB default) | repo root - and **no folder of its own here**: a nested one would mean a thirteenth file inside the frozen `context/` | **none - scoping is by directory placement only.** The root `AGENTS.md` carries the routing clause with its moment instead (one always-on line, 156 B) | it re-derives the read order, re-tries a `## Failed` approach, and writes nothing durable before stopping | 2026-11-07, Codex docs |
+| VS Code / Copilot | `AGENTS.md`, or `.github/copilot-instructions.md` (nested `AGENTS.md` files are read as *targeted* instructions; which one wins is **unverified**) | repo root / `.github/` | `*.instructions.md` with `applyTo` frontmatter, in or below `.github/instructions/` | the session never learns `context/` exists: it answers from the chat, writes nothing, and reports no error | [1] |
+| Claude Code | `CLAUDE.md`, or `AGENTS.md`, which Claude Code reads **in place of** it | repo root; also a user-level home | `.claude/rules/` - the glob key is `paths`, not `applyTo` | it starts from an empty window with nothing pointing at the tree, and every session re-derives what the last one knew | [2] |
+| Cursor | `AGENTS.md`, or `.cursor/rules/*.mdc` - a plain `.md` there is **ignored**, having no frontmatter | `.cursor/rules/` | the `.mdc` frontmatter: `globs` (apply-to-files) or `description` (apply-intelligently) | a rule written at a plausible path is never loaded, because Agent reads only what it recognises - the file looks installed and is inert | [3] |
+| Codex / CLI agents | `AGENTS.md`, concatenated root-downward, one per directory, capped at `project_doc_max_bytes` (32 KiB default) | repo root - and **no folder of its own here**: a nested one would mean a thirteenth file inside the frozen `context/` | **none - scoping is by directory placement only.** The root `AGENTS.md` carries the routing clause with its moment instead (one always-on line, 156 B) | it re-derives the read order, re-tries a `## Failed` approach, and writes nothing durable before stopping | [4] |
 | Windsurf | **unverified** - `.windsurfrules` and `.windsurf/rules/` are the historically documented pair | - | unverified | **unverified** - cannot be named from here | **unverified**: `docs.windsurf.com` now redirects to a different vendor's customisation page |
 | no harness (a human) | `AGENTS.md` | repo root | not applicable | nothing - a human who opens `context/MEMORY.md` first is a legitimate wiring | by construction |
+
+**Sources**, fetched 2026-11-08. Only what each was read for is listed; nothing is cited that it does not
+state.
+
+| # | Document | What it settles |
+| --- | --- | --- |
+| [1] | `https://code.visualstudio.com/docs/agent-customization/custom-instructions-reference` and its runtime sibling `https://docs.github.com/en/copilot/reference/custom-instructions-support` | the harness-to-file table, `applyTo` as the `*.instructions.md` field with no default pattern, and `.claude/rules` using `paths` |
+| [2] | `https://code.claude.com/docs/en/memory` | `CLAUDE.md` load order, and `AGENTS.md` read *in place of* it |
+| [3] | `https://cursor.com/docs/rules` | `.mdc` required, a plain `.md` ignored for want of frontmatter, and `globs` / `description` as the applying keys |
+| [4] | `https://learn.chatgpt.com/docs/agent-configuration/agents-md` | root-downward concatenation, one file per directory, and `project_doc_max_bytes` defaulting to 32 KiB |
+
+Two cells moved because of this pass: Claude's glob key went from **unverified** to `paths` ([1] states it, and
+so does [2]'s rules section), and Copilot's "nearest wins" claim lost its parenthetical - no source fetched
+states a precedence between nested `AGENTS.md` files, so it is marked unverified rather than kept on memory.
 
 A harness missing from this table is unmeasured, not unsupported. **Any harness that loads a file at session
 start can be wired**, in four steps:

@@ -8,6 +8,3 @@ paths: "context/**,docs/**,**/AGENTS.md,**/CLAUDE.md"
      If another harness in this repo is the port target, replace it with a single line pointing at that
      harness's rule file instead - one body per repo, never two.
      A host repo must contain no `<!-- PORT:` marker; `skeleton/` is the only place one is legal. -->
-
-<!-- unverified: the frontmatter key that restricts a Claude rule to matching paths. `.claude/rules/` is
-     documented (Claude Code docs, 2026-11-07); this key is not. Confirm before relying on it. -->

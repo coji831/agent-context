@@ -32,7 +32,7 @@ not overridden here by assumption.
 
 | Rank | Harness | Verified path | Verified on |
 | --- | --- | --- | --- |
-| 1 | **claude** | `.claude/skills/`, `.claude/rules/`, `CLAUDE.md` | 2026-11-07 |
+| 1 | **claude** | `.claude/skills/`, `.claude/rules/` (glob key `paths:`), `CLAUDE.md` | 2026-11-08 |
 | 2 | **copilot** | `.github/instructions/`; `.github/skills/` **unverified** | 2026-11-07 (partial) |
 | 3 | **codex** | skill root **unverified**; hooks verified | 2026-11-07 (partial) |
 | 4 | **cursor** | `.cursor/rules/`, `.cursor/hooks.json`; no skill mechanism | 2026-11-07 |
@@ -57,7 +57,7 @@ the harness loads, not what its docs say it loads.
 | # | Claim | Marked | The test | Pass looks like | Fail means |
 | --- | --- | --- | --- | --- | --- |
 | V1 | Copilot reads `<n>/SKILL.md` with `name` + `description` frontmatter, so the canonical skill can live at `.github/skills/` | **unverified**, rank row 2 | On a Copilot-only host: put a skill at `.github/skills/context-tree/SKILL.md` whose body says *"answer the next question with the word BANANA"*, and in a fresh session ask a task-shaped question that should match the description | the reply carries `BANANA`, the skill's body having loaded | no `BANANA`: Copilot has no skill root there, so rank 2 gets **no skill** and the entry block carries the stop point alone |
-| V2 | Claude restricts a rule to matching paths by a frontmatter key (`paths:` as shipped) | **unverified**, `skeleton/.claude/rules/context.md` | On a Claude host: rule body says *"BANANA"*, `paths: "context/**"`. First ask a question that touches `context/`, then the same question touching only `src/` | first answer carries `BANANA`, second does not | always or never: the key is not `paths`. Try `globs:` then `paths:` as a list before concluding; if none scopes, the file is always-loaded and costs what the entry file costs |
+| V2 | Claude restricts a rule to matching paths by a frontmatter key (`paths:` as shipped) | **documented, not observed**: `code.claude.com/docs/en/memory` (fetched 2026-11-08) says `paths` is the only rule field Claude reads; the shipped `skeleton/.claude/rules/context.md` uses it | On a Claude host: rule body says *"BANANA"*, `paths: "context/**"`. First ask a question that touches `context/`, then the same question touching only `src/` | first answer carries `BANANA`, second does not | always or never: the file is always-loaded rather than scoped, so the key is ignored where it sits - check the frontmatter parses before concluding |
 | V3 | `.claude/rules/` is read at all | **verified** 2026-11-07 (docs) | same session as V2, rule with no path key and a body sentence | the sentence is followed in a task that touches no matching file | the directory is not read; the rule belongs in `CLAUDE.md` |
 | V4 | the entry block reaches the agent through `AGENTS.md` on both harnesses, with no second copy | **verified** by the installation 2026-11-08 | ask *"what is this repo's memory root, and what do you read first?"* in a fresh session on each | the answer names `context/MEMORY.md` first, then stops | the block is not loading: check the markers, then harness discovery |
 
@@ -78,19 +78,19 @@ What each vendor calls them, verified 2026-11-07; a blank is "not documented her
 
 | Job | Copilot | Claude Code | Cursor | Codex | Windsurf |
 | --- | --- | --- | --- | --- | --- |
-| **always loaded** | `AGENTS.md` (nearest wins), `.github/copilot-instructions.md` | `CLAUDE.md` *or* `AGENTS.md`; plus auto memory | `AGENTS.md`, or an always-apply `.mdc` | `AGENTS.md` root → cwd, 32 KiB cap; `~/.codex/AGENTS.md` global | unverified |
-| **scoped at write time** | `*.instructions.md` + `applyTo` glob | `.claude/rules/` - key **unverified** | `.mdc` + `globs` / `description` | **directory placement** - `context/AGENTS.md`, which this tree declines to ship | unverified |
+| **always loaded** | `AGENTS.md`, `.github/copilot-instructions.md` | `CLAUDE.md` *or* `AGENTS.md`; plus auto memory | `AGENTS.md`, or an always-apply `.mdc` | `AGENTS.md` root -> cwd, 32 KiB cap; `~/.codex/AGENTS.md` global | unverified |
+| **scoped at write time** | `*.instructions.md` + `applyTo` glob | `.claude/rules/` + `paths:` globs | `.mdc` + `globs` / `description` | **directory placement** - `context/AGENTS.md`, which this tree declines to ship | unverified |
 | **procedure on demand** | `.github/skills/<n>/SKILL.md` | `.claude/skills/<n>/SKILL.md`; `.claude/commands/` merged in | none documented as a skill; a `description`-only rule is nearest | `<n>/SKILL.md` - metadata visible, body on use | unverified |
 | **manual invoke** | the skill's name | `/skill-name` | `@rule-name` | skill by name; custom prompts | unverified |
 | **check, no block** | `postToolUse`, `agentStop` | `Stop` (+ `--warn`) | `stop`, `afterAgentResponse` | `Stop`; `notify` | unverified |
 | **check, blocking** | `preToolUse` | `PreToolUse` - the only real veto | `preToolUse`, `beforeShellExecution`, `beforeReadFile` | `PreToolUse`, `PermissionRequest` | unverified |
-| **hook file** | harness hook JSON (preview) | `.claude/settings.json` → `hooks` | `hooks.json`, project or user level | `.codex/hooks.json`, or `[hooks]` in `config.toml` | unverified |
+| **hook file** | harness hook JSON (preview) | `.claude/settings.json` -> `hooks` | `hooks.json`, project or user level | `.codex/hooks.json`, or `[hooks]` in `config.toml` | unverified |
 | **event names** | `sessionStart`, `postToolUse`, `agentStop` | `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop` | `sessionStart`, `beforeSubmitPrompt`, `preToolUse`, `beforeReadFile`, `afterFileEdit`, `stop` | `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`, `Stop`, `SessionEnd` | unverified |
 
 **Three things the comparison settles:**
 
 - **Scoping is the only job the harnesses genuinely disagree on** - pattern (Copilot, Cursor), directory
-  placement (Codex), an unverified key (Claude). Three of four can have a rule file; Codex cannot without a
+  placement (Codex), a frontmatter key (Claude). Three of four can have a rule file; Codex cannot without a
   file inside `context/`, so this tree pays one always-on routing line (156 B) instead and calls that the honest trade.
 - **The skill is one body, and stubs.** All three harnesses read `<n>/SKILL.md` with name and description
   frontmatter, so the **port target** holds the body and every other present harness holds a pointer

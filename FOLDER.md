@@ -33,9 +33,9 @@ where the shared text goes, legal here and nowhere else.
 - `context/` - the memory root, mapped below.
 - `context.config.json` - **the host's starting config**: its paths are the host's own, `shells` names all four rule files, and `port_target` starts null, so `check --only installed` fails until the fill. **Trim `shells` to the harness folders you copied** - a named-but-absent path fails `installed`. The repo's own config is the separate file at the repo root.
 - `.gitignore` - `__pycache__/` and `*.py[cod]`, plus the two tool caches; copied to a host root, or merged into an existing file. Without it a `cp -r` of `scripts/` can carry a bytecode cache into the host's first commit.
-- `scripts/contextctl.py` - the **gate runner**, the only copy: `check` (four default gates), `check --all` (plus the four opt-in), `--warn`, `--only`, `--skip`, `--json`; it reads and reports and **writes nothing**. Copied to the host's own `scripts/contextctl.py`, where the hook commands have always pointed; inert until invoked, so it is a skeleton file and not a `port/` one.
+- `scripts/contextctl.py` - the **gate runner**, the only copy: `check` (four default gates), `check --all` (plus the four opt-in), `--warn`, `--only`, `--skip`, `--json`, and `brief` as a **stub** that writes nothing and exits 0 so a hook has something real to call; it reads and reports and **writes nothing else**. Copied to the host's own `scripts/contextctl.py`, where the hook commands have always pointed; inert until invoked, so it is a skeleton file and not a `port/` one.
 - `.github/instructions/context.instructions.md` - the write-time **trigger**, as a **shell**: `applyTo` frontmatter only, then a `<!-- PORT: context-rules -->` marker. Install fills that marker from `port/blocks/context-rules.md`; injected only when a governed path is touched.
-- `.claude/rules/context.md` - the same shell in Claude frontmatter (**key unverified**); at write time.
+- `.claude/rules/context.md` - the same shell in Claude frontmatter (`paths:`, not `applyTo:`; both keys documented by the harness vendors - see `AGENTIC-SYSTEM.md`'s sources); at write time.
 - `.cursor/rules/context.mdc` - the same shell as `.mdc`, because a plain `.md` here is ignored; at write time.
 - `.windsurf/rules/context.md` - the same shell, **path and frontmatter unverified**; at write time if the path holds.
 
@@ -111,7 +111,8 @@ Only as the work needs them:
 
 The entry file, the shells, the skill, the hook shapes and the gate runner are here. What is still absent:
 
-- a generated `briefing.md` and its `brief` command; the register is the copy until a renderer exists;
+- a generated `briefing.md`; `brief` exists as a stub that writes nothing and says so, and the register is
+  the copy until a renderer exists;
 - `resolve --where` and `.context-root` - the marker earns its place only when a workspace nests two trees,
   and with it the `.gitignore` for a derived `state/` that nothing writes yet;
 - `inbox.md` is not designed and nothing routes to it: a thought that cannot be filed yet has no home, and
