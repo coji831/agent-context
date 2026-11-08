@@ -108,10 +108,14 @@ def load_config(root: Path, explicit: str | None) -> tuple[dict, list[str]]:
     except re.error as error:
         problems.append(f'leaf_pattern "{cfg["leaf_pattern"]}" is not a valid regular expression: {error}')
     known = set(known_names())
-    for key in ("checks_disabled", "checks_advisory", "extra_checks"):
+    for key in ("checks_disabled", "checks_advisory"):
         for name in cfg.get(key) or []:
             if name not in known:
                 problems.append(f'{key}: "{name}" is not a gate this tool has')
+    for spec in cfg.get("extra_checks") or []:
+        module_name, _, function_name = str(spec).partition(":")
+        if not module_name.strip() or not function_name.strip():
+            problems.append(f'extra_checks: "{spec}" is not "module:function"')
     return cfg, problems
 
 
@@ -822,6 +826,72 @@ CHECKS = [
 GATES = {name: fn for name, fn, _ in CHECKS}
 
 
+# ------------------------------------------------------------------- a host's own checks
+
+
+def resolve_extra(root: Path, spec: str) -> tuple[object | None, str]:
+    """(callable, "") from `<root>/scripts/<module>.py`, or (None, the reason it is unusable).
+
+    A host's module is not this tool's to trust: an import that raises, a function that is absent and a
+    function that raises all become findings. A traceback-and-exit would take the green run with it, and
+    an adopter would learn to delete the check instead of fixing it.
+    """
+    module_name, _, function_name = spec.partition(":")
+    scripts = root / "scripts"
+    path = scripts / (module_name.replace(".", "/") + ".py")
+    if not path.is_file():
+        return None, f'no "{module_name}" module under scripts/'
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    try:
+        loader = importlib.util.spec_from_file_location(f"contextctl_extra_{module_name}", path)
+        module = importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(module)
+    except Exception as error:  # a host module may import anything, and fail
+        return None, f'importing "{module_name}" raised {type(error).__name__}: {error}'
+    function = getattr(module, function_name, None)
+    if not callable(function):
+        return None, f'"{module_name}" has no callable "{function_name}"'
+    return function, ""
+
+
+def extra_finding(gate: str, item, where: str) -> Finding:
+    """A host's finding: a dict with `message` and optional `rel` and `line`, or a plain string."""
+    if isinstance(item, str):
+        return Finding(gate, where, None, item)
+    if isinstance(item, dict):
+        line = item.get("line")
+        try:
+            line = int(line) if line is not None else None
+        except (TypeError, ValueError):
+            line = None
+        return Finding(gate, str(item.get("rel") or where), line, str(item.get("message") or item))
+    return Finding(gate, where, None,
+                   f'returned {type(item).__name__} {item!r}; a finding is a dict with a message or a string')
+
+
+def gate_extra(ctx: Ctx, spec: str) -> Result:
+    module_name, _, function_name = spec.partition(":")
+    gate = f"extra:{module_name}.{function_name}"
+    where = ctx.rel(ctx.root / "scripts" / (module_name.replace(".", "/") + ".py"))
+    function, problem = resolve_extra(ctx.root, spec)
+    if function is None:
+        return Result(gate, [Finding(gate, where, None, problem)], 0, "not run")
+    try:
+        value = function(ctx.root, ctx.cfg)
+    except Exception as error:  # a host check failing is a finding, not the end of the run
+        return Result(gate, [Finding(gate, where, None,
+                                     f"{function_name} raised {type(error).__name__}: {error}")],
+                      0, "raised")
+    if isinstance(value, (str, bytes)) or not isinstance(value, list):
+        return Result(gate, [Finding(gate, where, None,
+                                     f"returned {type(value).__name__}; expected a list of findings")],
+                      0, "not a list")
+    findings = [extra_finding(gate, item, where) for item in value]
+    noun = "finding" if len(value) == 1 else "findings"
+    return Result(gate, findings, len(value), f"{len(value)} {noun} from {module_name}.py")
+
+
 # ---------------------------------------------------------------------------- cli
 
 
@@ -911,14 +981,23 @@ def main(argv: list[str] | None = None) -> int:
     results: list[Result] = []
     blocking = 0
     advisory_findings = 0
-    for name in chosen:
-        result = GATES[name](ctx) if name in GATES else gate_installed(ctx)
-        forced = bool(args.warn) or name in advisory
+
+    def record(result: Result, forced: bool) -> None:
+        nonlocal blocking, advisory_findings
         blocking_findings = [] if forced else [f for f in result.findings if not f.advisory]
         result.advisory = forced or (bool(result.findings) and not blocking_findings)
         blocking += len(blocking_findings)
         advisory_findings += len(result.findings) - len(blocking_findings)
         results.append(result)
+
+    for name in chosen:
+        record(GATES[name](ctx) if name in GATES else gate_installed(ctx),
+               bool(args.warn) or name in advisory)
+    # A host's own checks are opt-in like the four opt-in gates: `--all` runs them, nothing else does,
+    # so a tree with no `extra_checks` still prints the same denominator it always printed.
+    extras = list(cfg.get("extra_checks") or []) if args.all else []
+    for spec in extras:
+        record(gate_extra(ctx, str(spec)), bool(args.warn))
 
     if args.json:
         payload = {
@@ -947,7 +1026,7 @@ def main(argv: list[str] | None = None) -> int:
         for finding in result.findings:
             print(finding.render())
     noun = "finding" if blocking == 1 else "findings"
-    ran_text = f"{len(results)} of {len(known_names())} gates ran"
+    ran_text = f"{len(results)} of {len(known_names()) + len(extras)} gates ran"
     print(f"{blocking} blocking {noun}; {ran_text}; "
           f"{advisory_findings} advisory; disabled: {', '.join(disabled) if disabled else 'none'}")
     return 1 if blocking else 0

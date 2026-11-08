@@ -114,8 +114,9 @@ A gate must have a non-zero denominator: a gate that measures nothing reports su
 zero files has silently passed. Three obligations, and they bind the tool:
 
 1. **Every gate counts its subjects and prints the count in its OK line**: `ok leaf-index 12 topics, 27
-   leaves`; `ok pointers 88 cited paths in 9 files`. The summary's denominator is **all nine known names**, never
-   the number that ran, so `check` says `5 of 9` and only `--all` says `9 of 9`: a ratio of one is no reading.
+   leaves`; `ok pointers 88 cited paths in 9 files`. The summary's denominator is **all nine known names**
+   plus the `extra_checks` that ran, never the number that ran, so `check` says `5 of 9` and only `--all`
+   says `9 of 9` (or `10 of 10` with one host check): a ratio of one is no reading.
 2. **Zero subjects is reported, and it blocks only where the location is absent**: `FAIL caps 0 artefacts;
    that location does not exist, and a gate that scanned nothing has not passed` is a misconfiguration, while
    `ok register 0 rows and folders - nothing here yet` is a fresh install or a drained topic and prints its
@@ -144,7 +145,16 @@ pointers). Budgets: `artefacts` and `root_artefacts` entries carrying `max_lines
 its leaves stop being invisible. It must match leaf files only: whatever it matches is read for an `id` and
 a `brief`. Fan-out is **not** a key:
 it is the contract's constant (10). Gates: `checks_disabled` (default `[]`), `checks_advisory` (default `[]`;
-a name here prints, never blocks), `extra_checks` (default `[]`; a host's assertion, same output shape).
+a name here prints, never blocks), `extra_checks` (default `[]`; a host's own check - the point below).
+**`extra_checks` is where a host attaches a rule this tool does not ship.** Each entry is
+`"module:function"`; the module is resolved from `<root>/scripts/` (that path is put on `sys.path`, so a
+module may import its siblings) and the function is called as `function(root, cfg)`. Its return value is a
+list of findings: a **dict** with `message` plus optional `rel` and `line`, or a **plain string**. Each
+check prints as one line named `extra:<module>.<function>`. They run **only under `check --all`**, exactly
+like the four opt-in gates, and the summary's denominator becomes `9 + the extras that ran` - so a tree
+with no extras still prints `N of 9 gates ran`. An entry that is not `module:function` exits **2**; a
+module that will not import, a function that is absent and a function that raises are each a **finding**,
+never a traceback that ends the run.
 `accepted_absent` (default `[]`) is `pointers`'s list of citations a clone cannot resolve: an entry is a
 path, a path prefix or a glob, a citation matching one is **accepted, not reported**, and the gate's own
 line prints how many it accepted - `ok pointers 108 cited paths in 14 files, 22 accepted absent` - so a
@@ -155,8 +165,8 @@ counted in the same number, with no config**: a memory tree may legitimately cit
 no tree root can resolve one.
 
 **A config that names a gate which does not exist fails loudly.** Any unknown name, in `checks_disabled`,
-`checks_advisory`, `extra_checks`, `--only` or `--skip`, exits **2** and lists every known name, the eight
-gates and `installed`, so a typo never reads as a pass and a hook naming a removed gate learns on run one.
+`checks_advisory`, `--only` or `--skip`, exits **2** and lists every known name, the eight gates and
+`installed`, so a typo never reads as a pass and a hook naming a removed gate learns on run one.
 **The one exception is `--only installed`, run alone**: it is the install proof `ADOPT.md` step 6 tells an
 adopter to run, and it never consults those lists, so a host carrying its own legacy gate names still gets
 its install checked - each ignored name is printed to stderr with `note:` and never silently dropped. Any

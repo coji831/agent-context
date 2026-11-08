@@ -627,6 +627,78 @@ class Archive(Base):
         self.assertIn("context/topics/archive: topic has no README.md", out)
 
 
+class ExtraChecks(Base):
+    """A host attaches its own rules through `extra_checks`; the published tool rejected the key outright.
+
+    Measured on the real host: three unique rules (`shell_checks:refs`, `:one_home`, `:briefing_current`)
+    were refused as gate names, so the coverage its retired checker was retired *into* became unreachable.
+    """
+
+    def module(self, source: str) -> None:
+        path = self.tree.root / "scripts" / "host_checks.py"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
+
+    def configured(self, *specs: str) -> None:
+        self.tree.config({"shells": [".claude/rules/context.md"], "extra_checks": list(specs)})
+
+    def test_a_host_check_reports_under_its_own_name(self) -> None:
+        self.module('def policy(root, cfg):\n'
+                    '    return [{"message": "policy.md is missing", "rel": "docs/policy.md", "line": 3}]\n')
+        self.configured("host_checks:policy")
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 1, out)
+        self.assertIn("extra:host_checks.policy", out)
+        self.assertIn("docs/policy.md:3: policy.md is missing", out)
+
+    def test_plain_strings_are_accepted(self) -> None:
+        self.module('def shallow(root, cfg):\n    return ["a plain sentence"]\n')
+        self.configured("host_checks:shallow")
+        self.assert_fails_with("a plain sentence", "check", "--all")
+
+    def test_a_clean_check_raises_the_denominator(self) -> None:
+        self.module('def clean(root, cfg):\n    return []\n')
+        self.configured("host_checks:clean")
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 0, out)
+        self.assertIn("extra:host_checks.clean", out)
+        self.assertIn("10 of 10 gates ran", out)
+
+    def test_it_runs_only_with_all(self) -> None:
+        self.module('def clean(root, cfg):\n    return ["should not run"]\n')
+        self.configured("host_checks:clean")
+        code, out = self.tree.run("check")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("extra:", out)
+        self.assertIn("5 of 9 gates ran", out)
+
+    def test_zero_extras_keeps_the_denominator(self) -> None:
+        self.configured()
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 0, out)
+        self.assertIn("9 of 9 gates ran", out)
+
+    def test_a_missing_module_is_a_finding_not_a_traceback(self) -> None:
+        self.configured("nowhere:policy")
+        self.assert_fails_with('no "nowhere" module under scripts/', "check", "--all")
+
+    def test_a_missing_function_is_a_finding(self) -> None:
+        self.module('def other(root, cfg):\n    return []\n')
+        self.configured("host_checks:policy")
+        self.assert_fails_with('has no callable "policy"', "check", "--all")
+
+    def test_a_raising_function_is_a_finding(self) -> None:
+        self.module('def boom(root, cfg):\n    raise ValueError("spec broke")\n')
+        self.configured("host_checks:boom")
+        self.assert_fails_with("raised ValueError: spec broke", "check", "--all")
+
+    def test_a_spec_without_a_function_is_a_config_error(self) -> None:
+        self.configured("host_checks")
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 2, out)
+        self.assertIn('is not "module:function"', out)
+
+
 class InstallProof(Base):
     """`check --only installed` is the runbook's install proof, so a legacy config may not preempt it.
 
