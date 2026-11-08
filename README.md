@@ -142,7 +142,9 @@ they read. Gates run at a milestone or when the owner asks, never as a turn-end 
 Copy `skeleton/AGENTS.md`, `skeleton/context/`, `skeleton/scripts/` and `skeleton/context.config.json` to your
 repo root, then the dot-folders for the harnesses you run (`.github/`, `.claude/`, `.cursor/`, `.windsurf/`) and
 `port/skill/` if that harness reads `SKILL.md`. Fill the rule shells (MANIFEST step 4) and the copy is a host
-tree; then delete `context/topics/widget/` and its row in `context/topics/INDEX.md`.
+tree; then delete `context/topics/widget/` and its row in `context/topics/INDEX.md`. **Nothing in that copy is
+a workflow or a required check**: your CI is untouched, and wiring `port/hooks/ci.yml` - or requiring it - is
+your decision afterwards.
 [`MANIFEST.md`](MANIFEST.md) is the map - which folder belongs to which harness, what is always and what is
 ported - plus the two rules that are easy to get wrong: **a repo that keeps `CLAUDE.md` deletes
 `AGENTS.md`**, because Claude reads one in place of the other; and **Codex needs no folder at all**, because

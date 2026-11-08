@@ -134,7 +134,9 @@ shell would be two files describing one thing; a single file copied once is smal
 5. **Fill the hooks, only if you chose an enforcement level.** There is **no hook shell in `skeleton/`** -
    hooks are executable, so a copy that lands unwanted runs a missing command every session. Copy a ready
    shape from `port/hooks/` and take the `command` lines from `port/blocks/hook-commands.md`. Not installed
-   by default.
+   by default, and **no CI either**: `port/hooks/ci.yml` is an example, nothing here adds a workflow to a
+   host that did not ask for one, nothing merges into a CI the host already runs, and requiring a check is
+   the host's decision - never a need of this tool.
 6. **Copy the skill** to the highest-ranked present harness that has a verified skill path;
    `port/skill-stub/` to every other present harness with one. No verified path means no skill.
 7. **Verify:** `python scripts/contextctl.py check --only installed` passes. That is the fact a marker search

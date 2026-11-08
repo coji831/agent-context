@@ -650,6 +650,14 @@ class ShippedWorkflows(unittest.TestCase):
         self.assertEqual(checked, len(self.WORKFLOWS),
                          f"only {checked} of {len(self.WORKFLOWS)} shipped workflows were read")
 
+    def test_the_adopter_workflow_declares_itself_optional(self) -> None:
+        """The owner's instruction: a tree must not affect an existing CI, so the example must say so."""
+        text = self.read("port/hooks/ci.yml")
+        for needle in ("EXAMPLE ONLY", "OPTIONAL", "NOT PART OF AN INSTALL",
+                       "must not have this workflow added alongside its own or merged into it",
+                       "fetch-depth: 0"):
+            self.assertIn(needle, text, f"port/hooks/ci.yml does not state {needle!r}")
+
     def test_checkout_fetches_the_full_history(self) -> None:
         checked = 0
         for name in self.WORKFLOWS:

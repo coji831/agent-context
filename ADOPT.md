@@ -164,6 +164,19 @@ only place one is legal.
 Recommend the **git pre-commit hook** from [`port/hooks/`](port/hooks) and nothing else: one file,
 harness-independent, survives every editor change. Tell the human `--no-verify` exists.
 
+**Installing this tree changes no workflow, no CI config and no required check.** The tree is files plus one
+script under `scripts/`; every hook, every workflow and every required status check that runs it is the
+host's choice, made after the install and owned by the host. [`port/hooks/ci.yml`](port/hooks/ci.yml) is an
+**example** to adapt or ignore: it is not part of an install, it must not be added alongside or merged into a
+CI the host already has, and requiring it as a status check is a host decision, never something this tool
+needs. Nothing here reads the host's CI, and nothing here edits it.
+
+If a host does adapt that workflow, keep its `fetch-depth: 0`: a depth-1 clone makes the clone boundary
+commit look like the commit that added every leaf, so `verified` **fails loudly on every push** (the shallow
+finding, `GATES.md`) instead of inventing dates. That is why depth is not optional *for this workflow* - and
+why the workflow itself is: a host that cannot provide history either fetches it or lists `verified` in
+`checks_advisory`.
+
 ## Step 8 - prove it, or it is not adopted
 
 `python scripts/contextctl.py check --all --warn` arrives with the copy, so prove it by machine first and by

@@ -8,7 +8,10 @@
 ## The gate set
 
 **Nothing here runs on its own.** No hook, no CI job and no turn-end check is installed by any step of this
-repo; `port/hooks/` holds shapes and says so, and gates run at a milestone or when the owner asks. So
+repo; `port/hooks/` holds shapes and says so, and gates run at a milestone or when the owner asks. An install
+copies files and one script: it adds **no workflow**, changes **no CI config** and requires **no status
+check**, and a host that already runs CI never has this tree's example workflow added alongside or merged into
+it. So
 "posture: gate" below means **blocking when the owner runs `check`**, not blocking something nobody asked
 for. Every gate guards an **`act`**; none guards an `ask` or `owner` trigger, since those are questions put
 to a human when they matter. *Cadence* says where a gate *belongs*, so a host wiring

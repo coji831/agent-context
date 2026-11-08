@@ -1,7 +1,17 @@
 # EXAMPLE ONLY - a shape to adapt, not a workflow to copy verbatim.
 #
+# OPTIONAL, AND NOT PART OF AN INSTALL. Installing this tree copies files and one script under
+# `scripts/`; it adds no workflow, changes no CI config and requires no status check. A host that
+# already runs CI must not have this workflow added alongside its own or merged into it: read it as
+# an example, then decide. Requiring a check on a branch is a host decision; this tool needs no CI.
+#
 # Intent: gate the merge. The only level that cannot be skipped locally, so it is where the opt-in
 # checks belong: they guard a surface that changes when a file is added, not on every wrap-up.
+#
+# A host that does adapt it must keep `fetch-depth: 0`. That line is optional nowhere: a depth-1 clone
+# makes the boundary commit look like the commit that added every leaf, and `verified` fails on every
+# push with its shallow finding (see `GATES.md`) instead of inventing dates. The workflow is optional;
+# its depth is not.
 
 name: context
 
