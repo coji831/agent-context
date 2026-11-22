@@ -17,12 +17,21 @@
 | --- | --- |
 | Where does this repo's knowledge live today? | the migration points at it; nothing is deleted |
 | Which harnesses run here, and which is primary? | that decides every path below, and the highest-ranked one owns the rule body |
-| Should this block, or only report? | a repo in month one wants reports; a settled repo can block |
+| Should this block, or only report? | a repo in month one wants reports; a settled repo can block. **`report` obliges a second answer: what act pays the backlog down** - see the note below |
 
 Rank order is Claude, then Copilot, then Cursor, then Windsurf (Codex needs no shell) - [`MANIFEST.md`](MANIFEST.md) § *The rank*.
 
 If you cannot ask, adopt in the **softest** shape, say so in one line, and leave the decision written
 down for the human to harden.
+
+**When the answer is `report`, ask one more thing: what act pays it down?** An advisory gate is a backlog, and
+a backlog with no action attached to it is a number nobody works. The shape that has been measured to work is a
+rule in the host's own root rules, attached to something the host already does - for a memory tree, *a leaf you
+touch earns its `id:`, its `brief:` and its index row in that same turn*. Measured on a real host,
+2026-11-08 to 2026-11-23: after that rule was written the advisory total fell **305 to 175 in fifteen days**
+with no migration booked and nobody assigned, and 49 leaves ended up carrying a real `brief` where 2 had. Before
+the rule, the same number had not moved. **Booking a migration pass** was this runbook's assumption until that
+reading came in; the rule is cheaper and it survives the sessions that were never planned.
 
 ## Step 2 - copy the memory, the gate runner, and its config
 

@@ -51,6 +51,28 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.8 - the two things a host rule gets wrong
+
+**1.0.8, 2026-11-23.** No gate changed. Two documentation findings and one claim that stopped being a claim,
+all from the first clean reading the pattern has had: **fifteen days in which nobody who built the tree touched
+it.** The reading is in the hub's `agent-memory` topic as leaf 23; what follows is what it obliges here.
+
+| Was | Is |
+| --- | --- |
+| `ADOPT.md` step 1 offered `report` or `block`, and the advisory section treated a backlog as something a migration pass works down | **an advisory gate obliges a payer.** Step 1 now asks what act pays the backlog down, and `GATES.md` carries the measured comparison: a host with *a leaf you touch earns its `id:`, `brief:` and index row* took its advisory total **305 → 175 (-43%) in fifteen days** with no migration and no operator, while the same number had not moved before the rule existed. The documented alternative, booking a pass, is now the second choice |
+| `extra_checks` documented the call contract and the finding shape, and stopped there - though it is the one seam a host fills in itself | **the two failures are named with their measurements.** *Scope*: a per-file base map cannot grow - a host with a two-entry map and 66 documents citing client code reported **296 findings, 227 of which were paths that exist under another base**; declare a **list of bases tried in order** and the same corpus reports 69. *Granularity*: in that same run **all 296 blocking findings came from one host rule while all nine shipped gates were green**, so a host rule earns `block` only after it has been watched over real material |
+| `MANIFEST.md` marked Copilot's `.github/skills/` **unverified** and queued claim **V1** for a test | **verified 2026-11-08 by observation**: a Copilot session invoked the skill **by name** and answered with its body's word. Rank row 2 may carry the skill; the `BANANA` probe is spent |
+
+**What this release does not do, deliberately.** It adds no gate and changes no tool behaviour, because nothing
+in the reading was a tool defect: every blocking finding in that host came from the host's own rule, and every
+shipped gate was green throughout. The lesson is about what the docs promised, not about what the code did.
+
+**Still open, and unchanged by this release.** `ported` accepts any well-formed date including a future one, and
+the entry block's *content* remains unmeasurable - both recorded under 1.0.7, neither observed to bite. The
+pattern's own rule applies: a change with no failing case behind it is a preference, not a fix.
+
+**Tests: 103 before, 103 after.** A documentation release; the suite asserts no prose.
+
 ## 1.0.7 - the block nobody counted
 
 **1.0.7, 2026-11-08.** Two defects in the one gate that decides whether the tree arrived at all. Both are

@@ -164,6 +164,26 @@ zero files has silently passed. Three obligations, and they bind the tool:
    wrong answer is worse than a loud failure. A host that cannot provide history lists `verified` in
    `checks_advisory`, which is the opt-out that already exists.
 
+## An advisory gate is a backlog, and a backlog needs a payer
+
+`checks_advisory` prints a finding and exits 0 on it, which is the right setting for a host in its first month.
+It is not a neutral choice: the count becomes a promise, and only two things keep a promise - a scheduled
+migration, or a rule attached to work the host already does. **The second is the one that has been measured.**
+
+| Shape | Measured on a real host, 2026-11-08 to 2026-11-23 | Verdict |
+| --- | --- | --- |
+| advisory, no per-turn rule | 305 findings, unchanged, while the tree grew from 12 topics to 13 | a number nobody acts on |
+| advisory + *a leaf you touch earns its `id:`, `brief:` and index row* | **305 → 175 (-43%)** in fifteen days with no migration and no operator: `shape` -82, `leaf-index` -51, and 49 leaves carrying a real `brief` where 2 did | **the recommended shape** |
+| advisory, then `checks_disabled` | the count disappears with the block, so the backlog stops being visible | never - it erases the reading |
+
+Two obligations follow. **Say what pays it down**, in the host's root rules, attached to an act rather than a
+date. And **give the advisory decision an end condition** - which gate turns blocking, and when - because an
+advisory gate nobody has agreed to promote is a permanently quiet one.
+
+**A count that grows is not automatically a regression.** A host adding leaves adds findings; what matters is
+the debt against the material, not the absolute number. `caps` rose by 6 in the reading above while the total
+fell by 130, and that was new leaves over the cap, which is what a growing tree looks like.
+
 ## The config surface
 
 Keys the gate set requires, and nothing else. Paths: `memory`, `root_rules`, `index_of_topics`,
@@ -185,6 +205,23 @@ like the four opt-in gates, and the summary's denominator becomes `9 + the extra
 with no extras still prints `N of 9 gates ran`. An entry that is not `module:function` exits **2**; a
 module that will not import, a function that is absent and a function that raises are each a **finding**,
 never a traceback that ends the run.
+
+**Two things a host rule gets wrong, and both have been measured.** A host rule is written once, against the
+material in front of its author, and then meets material the author never saw. This tree ships **no** rule that
+resolves citations inside a leaf - `pointers` deliberately covers the four routing files in `MEMORY.md`, the
+root rules, the entry block and a topic `README.md`, because a leaf cites the world - so leaf-level citation
+checking is the seam where that judgement lands, and where it has failed twice:
+
+- **Scope.** A rule that resolves a path must say what the path resolves *against*. The failure is a per-file
+  exception map - one entry per document that cites something unusual - because it cannot grow. Measured
+  2026-11-23: a host with a **two-entry** map and 66 documents citing client code produced **296 findings, and
+  227 of them were paths that exist, resolved from the wrong base**. Declare bases as a **list tried in
+  order** - the tree root, the citing file's own folder, each checkout the host reads - and keep a per-file
+  entry only as an override; the same corpus then reports 69.
+- **Granularity.** A blocking host rule coarser or finer than the material becomes the dominant failure mode of
+  the whole surface: in that same reading **all 296 blocking findings came from one host rule, and all nine
+  shipped gates were green**. A host rule earns `block` after it has been watched over real material; before
+  that it belongs in `checks_advisory`, which is the host's own dated decision.
 `accepted_absent` (default `[]`) is `pointers`'s list of citations a clone cannot resolve: an entry is a
 path, a path prefix or a glob, a citation matching one is **accepted, not reported**, and the gate's own
 line prints how many it accepted - `ok pointers 108 cited paths in 14 files, 22 accepted absent` - so a

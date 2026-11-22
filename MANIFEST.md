@@ -33,7 +33,7 @@ not overridden here by assumption.
 | Rank | Harness | Verified path | Verified on |
 | --- | --- | --- | --- |
 | 1 | **claude** | `.claude/skills/`, `.claude/rules/` (glob key `paths:`), `CLAUDE.md` | 2026-11-08 |
-| 2 | **copilot** | `.github/instructions/`; `.github/skills/` **unverified** | 2026-11-07 (partial) |
+| 2 | **copilot** | `.github/instructions/`; `.github/skills/` **verified 2026-11-08** (observed) | 2026-11-08 |
 | 3 | **codex** | skill root **unverified**; hooks verified | 2026-11-07 (partial) |
 | 4 | **cursor** | `.cursor/rules/`, `.cursor/hooks.json`; no skill mechanism | 2026-11-07 |
 | 5 | **windsurf** | nothing verified | - |
@@ -56,10 +56,15 @@ the harness loads, not what its docs say it loads.
 
 | # | Claim | Marked | The test | Pass looks like | Fail means |
 | --- | --- | --- | --- | --- | --- |
-| V1 | Copilot reads `<n>/SKILL.md` with `name` + `description` frontmatter, so the canonical skill can live at `.github/skills/` | **unverified**, rank row 2 | On a Copilot-only host: put a skill at `.github/skills/context-tree/SKILL.md` whose body says *"answer the next question with the word BANANA"*, and in a fresh session ask a task-shaped question that should match the description | the reply carries `BANANA`, the skill's body having loaded | no `BANANA`: Copilot has no skill root there, so rank 2 gets **no skill** and the entry block carries the stop point alone |
+| V1 | Copilot reads `<n>/SKILL.md` with `name` + `description` frontmatter, so the canonical skill can live at `.github/skills/` | **verified 2026-11-08 (observed)**, rank row 2 | On a Copilot-only host: put a skill at `.github/skills/context-tree/SKILL.md` whose body says *"answer the next question with the word BANANA"*, and in a fresh session ask a task-shaped question that should match the description | the reply carries `BANANA`, the skill's body having loaded | no `BANANA`: Copilot has no skill root there, so rank 2 gets **no skill** and the entry block carries the stop point alone |
 | V2 | Claude restricts a rule to matching paths by a frontmatter key (`paths:` as shipped) | **documented, not observed**: `code.claude.com/docs/en/memory` (fetched 2026-11-08) says `paths` is the only rule field Claude reads; the shipped `skeleton/.claude/rules/context.md` uses it | On a Claude host: rule body says *"BANANA"*, `paths: "context/**"`. First ask a question that touches `context/`, then the same question touching only `src/` | first answer carries `BANANA`, second does not | always or never: the file is always-loaded rather than scoped, so the key is ignored where it sits - check the frontmatter parses before concluding |
 | V3 | `.claude/rules/` is read at all | **verified** 2026-11-07 (docs) | same session as V2, rule with no path key and a body sentence | the sentence is followed in a task that touches no matching file | the directory is not read; the rule belongs in `CLAUDE.md` |
 | V4 | the entry block reaches the agent through `AGENTS.md` on both harnesses, with no second copy | **verified** by the installation 2026-11-08 | ask *"what is this repo's memory root, and what do you read first?"* in a fresh session on each | the answer names `context/MEMORY.md` first, then stops | the block is not loading: check the markers, then harness discovery |
+
+**V1 passed, and it was the reading the row was waiting for.** 2026-11-08: a Copilot session opened in a scratch
+host whose only instruction was a skill at `.github/skills/context-tree/SKILL.md` invoked it **by name** through
+the harness's own skill loader and answered with the body's word. The skill root is real for Copilot in VS Code,
+so rank 2 may carry the skill, and that `BANANA` test is now spent - it cannot be reused as a blind probe.
 
 **Rules for the round.** One claim per session, so a `BANANA` cannot come from the previous test. Record the
 harness version and the date beside each result. A pass updates the rank table's date and drops the marker at
