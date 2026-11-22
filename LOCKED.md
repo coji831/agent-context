@@ -51,11 +51,34 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.0.9 - the pointer out of the repo
+
+**1.0.9, 2026-11-23.** One defect, and it was in 1.0.8's own opening paragraph: a sentence pointed the reader at
+**another repository's topic and a leaf number that exists only there**. Nothing in this repo resolves it, and a
+reader who follows it cannot.
+
+It is the same defect as the 1.0.3 finding - a citation to `agent/WIRING.md` and a commit that this repository
+never held - and it survived the same way: it was written by someone who had the other checkout open and did not
+notice the sentence was about their desk rather than about the pattern. **A measurement transfers; a pointer
+does not.** The counts and dates in that section are the reading and they stay; the location of the reading was
+never this repo's business.
+
+| Was | Is |
+| --- | --- |
+| `LOCKED.md` 1.0.8 opened by naming another repo's topic and leaf as the place the reading lives | the sentence states what the interval was - a host left alone after installation - and stops. The 1.0.8 text was corrected in place, as 1.0.6 corrected 1.0.2's wrong claim, rather than left to mislead |
+
+**Found by asking the question, not by a gate.** The published repo has no check for "does this sentence refer to
+something outside me"; `pointers` resolves paths, not prose. Recorded here so the next audit starts with the
+question: *read every sentence that has a noun this repo does not define.*
+
+**Tests: 103 before, 103 after.** Documentation only; no gate and no tool behaviour changed.
+
 ## 1.0.8 - the two things a host rule gets wrong
 
 **1.0.8, 2026-11-23.** No gate changed. Two documentation findings and one claim that stopped being a claim,
 all from the first clean reading the pattern has had: **fifteen days in which nobody who built the tree touched
-it.** The reading is in the hub's `agent-memory` topic as leaf 23; what follows is what it obliges here.
+it** - a host left alone after installation, which is the only way to learn what the docs actually obliged. What
+follows is what that reading obliges here.
 
 | Was | Is |
 | --- | --- |
