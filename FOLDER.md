@@ -7,6 +7,13 @@ opened. Then `context/MUST-KNOW.md`, then the one topic the task touches, then s
 
 ## Repo root - the documents, the pin, the tests and the CI, and none of them a node of the memory
 
+- `AGENTS.md` - **the rules for changing this repo**, compressed to seven and **always loaded**: a claim is observed, nothing points outside the repo, a number is derived, the runbook runs by a stranger, docs are the API, scope, and *the second occurrence of a defect becomes a gate*. Its first paragraph says so, which is the rule about files added "for agents".
+- `CLAUDE.md` - one line, `@AGENTS.md`. **Not a second copy**: Claude substitutes rather than merges, and an import is what keeps one body. Adding a copy here is the failure `ADOPT.md` names for hosts, and it applies to this repo too.
+- `CONTRIBUTING.md` - **the long form of the seven rules**, each bought by a defect this repo shipped, plus the escalation rule and what does not belong here. Read before a first change; not auto-loaded by any harness, which is why `AGENTS.md` exists.
+- `.github/instructions/prose.instructions.md` - the three claim rules **scoped to `**/*.md`**, because the prose is the product; loads only when a markdown file is edited.
+- `.github/skills/contribute/SKILL.md` - the change procedure: find the failing case, decide the home, run the thing, grep your own diff, record it.
+- `.github/skills/release-verify/SKILL.md` - the release procedure: tag to CI run, clean clone at the tag, no pointer leaves the repo, a stranger installs it, the notes are a file at that commit. Separate from `contribute` because proving a release is a different job from cutting one.
+
 - `FOLDER.md` - this map: what each file is, when it loads, and what edits it; read first.
 - `CONCEPT.md` - the six-value argument that decides a placement; on demand, when a placement is in question.
 - `README.md` - the short entry: the tree, the load slots, what this repo does not carry yet; on demand.
@@ -15,13 +22,14 @@ opened. Then `context/MUST-KNOW.md`, then the one topic the task touches, then s
 - `ADOPT.md` - the runbook an agent follows to put the tree on a host repo, fresh or add-on; when adopting, and never again.
 - `AGENTIC-SYSTEM.md` - how a harness connects at all: the authoring map (§0 - where each artefact is edited), the three connection layers in order with what each silently does without, per harness the file that must exist, the write contract, the dispute order, and one worked arrival; when the wiring is in question.
 - `MECHANISM.md` - **how the tree is used**: the five stages with the file each writes and its mutability, the operations at each turn, who may perform each one without asking (`act` / `ask` / `owner`), one worked session; on demand, when the operation or a write's authority is in question, never loaded by a session.
-- `VERSION` - `1.0.9`; read by tooling and humans, never by a session. What the first release contains, and the decisions behind it: `LOCKED.md`.
+- `VERSION` - `1.1.0`; read by tooling and humans, never by a session. What the first release contains, and the decisions behind it: `LOCKED.md`.
 - `.gitattributes` - `* text=auto eol=lf`, with `.ps1` at CRLF; read by git, never by a session. It is load-bearing rather than tidy: a CRLF `port/hooks/pre-commit.sh` fails under bash with `$'\r': command not found`, which is a hook that looks installed and cannot run.
 - `.gitignore` - `__pycache__/` and `*.py[cod]`, plus the two tool caches; read by git, never by a session. A committed `.pyc` is a diff nobody reads and a file every run rewrites.
 - `LOCKED.md` - the owner's rulings, the release record and the step decisions behind them; a human audit trail, never loaded by a session.
 - `context.config.json` - **this repo's own config**: every path points under `skeleton/context/`, `installed` and `ported` are disabled (the shipped shells hold markers), `verified` is advisory. The host's starting config is the separate file inside `skeleton/`, copied with it.
 - `tests/` - `test_gates.py`: `python -m unittest discover -s tests`; every gate fails on its own defect fixture and passes on a clean tree. Not copied to a host: it tests the tool, not the memory tree.
 - `.github/workflows/context.yml` - this repo's own CI: `skeleton/scripts/contextctl.py check --all` over the shipped tree, then the tests. **A host has no equivalent in an install**: copying this tree lands no workflow and edits no CI, and a host that wants CI adapts `port/hooks/ci.yml` itself.
+- `.github/instructions/` and `.github/skills/` - **this repo's own contributor surface, not shipped**: a prose rule scoped to `**/*.md` and two procedures. They are here rather than in `skeleton/` for the same reason `tests/` is: a host installs the tree's shape, not this repo's way of maintaining it.
 
 ## skeleton/ - the shells a host fills
 

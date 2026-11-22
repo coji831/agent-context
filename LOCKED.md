@@ -51,6 +51,37 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
 
+## 1.1.0 - the contributor surface
+
+**1.1.0, 2026-11-23.** The repo had nine documents describing the pattern, and **nothing describing how to change
+it** - which is how two external-pointer defects and one unexecuted claim shipped in nine releases. This release
+adds the contributor surface and changes no gate.
+
+**It began as a simulation, which is the part worth recording.** A working agent was put in a host repo that runs
+this pattern, told only that v1.0.9 existed and was documentation-only, and asked what it would do. Three findings
+came back that no gate had made:
+
+| The finding | What it obliged here |
+| --- | --- |
+| A host cannot satisfy `shape` for a leaf it must never edit. The agent reported a topic holding **baseline files whose SHA-256 is recorded**, frozen by the host's own rule, against a gate demanding `id:` and `brief:` in the first two lines; the only lever is `checks_disabled`, which disables the gate for the whole tree | recorded as an **open gap**, not fixed here: there is no per-leaf or per-topic exemption, and inventing one changes the config contract. The agent's choice - keep the baseline and take the advisory - is the correct one, and the pattern should say so |
+| The agent could not reproduce this repo's own quoted measurement. 1.0.8 says a two-entry base map over 66 documents produced 296 findings of which 227 exist under another base; the agent measured 56 and 181 under the bases it could infer, because **the sentence does not state the bases or their order** | becomes rule 3 of `CONTRIBUTING.md`: *put the method beside the number, or the number is not reproducible*. 1.0.8's paragraph is left as it stands - a measurement is evidence, and evidence is not rewritten to match a later standard - but the next one carries its method |
+| The agent worked out that 1.0.8's paragraph was **about its own repo**, from the counts alone: *"The paragraph is about this host, and I only learned it after the fact."* Anonymising a measurement by removing the name does not anonymise it | recorded as the limit of rule 2: a number may transfer, and a reader can still identify the subject. If a future release needs a consumer's numbers to stay unattributable, it must generalise the shape rather than paste the counts |
+
+| Was | Is |
+| --- | --- |
+| nothing described how to change this repo; the only procedure was four lines inside `LOCKED.md` § *Changing the pattern* | `CONTRIBUTING.md` carries **seven rules, each bought by a defect this repo shipped**, the definition of done, and the escalation rule - *the second time a class of defect ships it becomes a gate, not a stronger reminder*. `LOCKED.md`'s four lines stay, because they are the short form of the same procedure |
+| an agent arriving here learned the rules only if it happened to read a document that no harness auto-loads | **`AGENTS.md`, always loaded**, carrying the seven rules compressed; `CLAUDE.md` is one line, `@AGENTS.md`, an import rather than a copy, because Claude substitutes rather than merges |
+| the prose rules existed but nothing scoped them to prose | `.github/instructions/prose.instructions.md`, `applyTo: "**/*.md"` - the three claim rules, loaded only when a markdown file is edited |
+| no procedure existed for making a change or proving a release | `.github/skills/contribute/` and `.github/skills/release-verify/` - two skills, one procedure each, so the second can be run against a tag by someone who did not cut it |
+
+**Why the split matters, which is the research finding underneath it.** Both harness vendors document that
+instruction files are context and not enforcement (Claude Code: *"They aren't enforced configuration"*; VS Code:
+*"They don't guarantee compliance or replace tests, code review, or security controls"*). So these artefacts
+define what **done** means; they cannot make a claim true. The gate that would is named in § *Still open* below,
+and it is the one item this release deliberately leaves for the owner's word.
+
+**Tests: 103 before, 103 after.** The suite asserts no prose, and this release adds no code.
+
 ## 1.0.9 - the pointer out of the repo
 
 **1.0.9, 2026-11-23.** One defect, and it was in 1.0.8's own opening paragraph: a sentence pointed the reader at
