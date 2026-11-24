@@ -223,6 +223,43 @@ class Register(Base):
         self.assert_fails_with("differs from widget/README.md Verified", "check")
 
 
+class UnreadableDates(Base):
+    """A gate fails on an input it cannot read instead of skipping it.
+
+    Measured on a real host, 2026-11-24: two drained-topic shims put `Verified:` at the end of a line and one
+    topic lowercased it, so `verified` reported 6 of 9 dated topics and printed no finding for the other three.
+    """
+
+    SHIM = ("# widget\n\n> last-updated {today} · Verified: {today}\n\n## Leaves\n\n"
+            "| id | Leaf | Brief - what it answers |\n| --- | --- | --- |\n")
+
+    def test_a_date_at_the_end_of_a_line_is_not_a_date(self) -> None:
+        self.tree.write("context/topics/widget/README.md", self.SHIM)
+        self.tree.git()
+        out = self.assert_fails_with('has no "Verified:" line at the start of a line',
+                                     "check", "--only", "register")
+        self.assertIn("a date at the end of a line does not count", out)
+
+    def test_verified_reports_the_topic_it_could_not_date(self) -> None:
+        self.tree.write("context/topics/widget/README.md", self.SHIM)
+        self.tree.git()
+        out = self.assert_fails_with("so this topic was not dated", "check", "--only", "verified")
+        self.assertIn("context/topics/widget/README.md", out)
+
+    def test_a_lowercase_verified_is_not_a_verified(self) -> None:
+        self.tree.write("context/topics/widget/README.md",
+                        "# widget\n\nverified: {today}\n\n## Leaves\n\n"
+                        "| id | Leaf | Brief - what it answers |\n| --- | --- | --- |\n")
+        self.tree.git()
+        self.assert_fails_with('no "Verified:" line at the start of a line', "check", "--only", "verified")
+
+    def test_a_missing_readme_names_the_row_it_could_not_check(self) -> None:
+        (self.tree.root / "context/topics/widget/README.md").unlink()
+        self.tree.git()
+        self.assert_fails_with("widget/README.md is missing, so this row's date was not checked",
+                               "check", "--only", "register")
+
+
 class LeafIndex(Base):
     def test_leaf_with_no_row(self) -> None:
         self.tree.write("context/topics/widget/L-0002-more.md",

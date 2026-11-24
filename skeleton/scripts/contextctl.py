@@ -466,8 +466,18 @@ def gate_register(ctx: Ctx) -> Result:
         if name not in folders:
             findings.append(Finding(gate, ctx.rel(index), number, f'row names "{raw}", no such folder'))
             continue
-        verified = topic_verified(folders[name].readme)
-        if when and verified and when != verified:
+        readme = folders[name].readme
+        if not readme.exists():
+            findings.append(Finding(gate, ctx.rel(index), number,
+                                    f"{name}/README.md is missing, so this row's date was not checked"))
+            continue
+        verified = topic_verified(readme)
+        if not verified:
+            findings.append(Finding(gate, ctx.rel(index), number,
+                                    f'{name}/README.md has no "Verified:" line at the start of a line, so this '
+                                    "row's date was not checked; a date at the end of a line does not count"))
+            continue
+        if when and when != verified:
             findings.append(Finding(gate, ctx.rel(index), number,
                                     f"row date {when} differs from {name}/README.md Verified: {verified}"))
     seen: dict[str, list[int]] = {}
@@ -767,9 +777,20 @@ def gate_verified(ctx: Ctx) -> Result:
     gate = "verified"
     findings = []
     undated = 0
+    for topic in ctx.topics:
+        where = ctx.rel(topic.readme)
+        if not topic.readme.exists():
+            findings.append(Finding(gate, where, None,
+                                    "README.md is missing, so this topic was not dated"))
+        elif not topic_verified(topic.readme):
+            findings.append(Finding(gate, where, None,
+                                    'no "Verified:" line at the start of a line, so this topic was not dated; '
+                                    "a date at the end of a line does not count"))
     dated = [topic for topic in ctx.topics if topic_verified(topic.readme)]
     if not dated:
-        return zero(gate, ctx.rel(ctx.topics_dir), "dated topics")
+        if not ctx.topics:
+            return zero(gate, ctx.rel(ctx.topics_dir), "dated topics")
+        return Result(gate, findings, 0, f"0 dated topics, {len(ctx.topics)} without a readable date")
     if git_shallow(ctx.root):
         findings.append(Finding(gate, ctx.rel(ctx.tree_root), None,
                                 "the clone is shallow, so the last-commit date git reports for a leaf "
