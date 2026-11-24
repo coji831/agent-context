@@ -26,7 +26,7 @@ stale; and the always-loaded file is paid for at every start even when it is not
 it and later drains. Authority - a spec, a locked brief - is host-supplied, and a topic never becomes it:
 if a decision exists only in a topic, it is not yet a requirement. Cost: the distinction has to be held
 every time someone reaches for a folder, the drain is a judgement no script performs, and a topic that
-outlives its task leaves a shim whose path and date someone must verify.
+outlives its task leaves a register row whose path and date someone must check.
 
 **4. Mutability decides the file.** A snapshot rewritten at wrap-up and a history appended forever cannot
 share a document; neither can constraints that are pruned and an index that is consulted. What is rewritten

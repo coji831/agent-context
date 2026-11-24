@@ -1,9 +1,10 @@
 {
-  "_comment": "The config a host starts with: copy it with skeleton/ and fill the two values MANIFEST names - `port_target` and each shell's `ported:` line, both filled in ADOPT step 6. Paths are the host's own, so `python scripts/contextctl.py check --only installed` fails until the markers are gone, which is the install check.",
+  "_comment": "The config a host starts with: copy it with skeleton/ and fill the two values MANIFEST names - `port_target` and each shell's `ported:` line, both filled in ADOPT step 6. Paths are the host's own, so `python scripts/contextctl.py check --only installed` fails until the markers are gone, which is the install check. `archive_dir` is where a drained topic's files live; a register row naming a folder there is a receipt, and the gate checks that the folder exists.",
   "memory": "context/MEMORY.md",
   "root_rules": "context/MUST-KNOW.md",
   "index_of_topics": "context/topics/INDEX.md",
   "topics_dir": "context/topics",
+  "archive_dir": "context/archive",
   "entry_file": "AGENTS.md",
   "shells": [
     ".github/instructions/context.instructions.md",

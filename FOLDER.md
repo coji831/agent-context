@@ -96,7 +96,7 @@ drift).
 
 ### skeleton/context/archive/ - where a drained topic's files go; created by the first drain, absent until then
 
-- `<topic>-<original name>` - one flat folder at the tree root, holding the leaves, `decisions.md` and `JOURNEY.md` of every drained topic, each file prefixed with its topic name so two topics cannot collide; **never read by an agent** unless a shim sends it there, and **never inside `topics/`** - every gate scopes to `topics_dir`, so an archive folder there reads as a live topic and its leaves as live ones, failing `register` and `leaf-index` on a correct drain.
+- `<topic>/` - one folder per drained topic under `archive_dir` (`context/archive/` by default), holding the leaves, `decisions.md` and `JOURNEY.md` of that topic, named exactly as the topic was; the register row for it names this folder, so no file prefix is needed and two topics cannot collide. **Never inside `topics/`** - every gate scopes to `topics_dir`, so an archive folder there reads as a live topic and its leaves as live ones, failing `register` and `leaf-index` on a correct drain. Its `README.md` is two lines saying which topic it holds, when it was drained and where what is still true now lives, because nothing else in the tree points a reader here.
 
 ## A correct new topic, from this document and `CONCEPT.md` alone
 

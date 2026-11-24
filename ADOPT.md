@@ -284,6 +284,41 @@ Two trees in one repo root is not a merge - if the host already carries a memory
 scaffold, decide which one owns `context/` before starting, and never promote one tree's note into the
 other's topic.
 
+## Upgrading an install that already runs a previous release
+
+A host that adopted the tree and now takes a newer one is not installing again: it is replacing two files and
+deciding what to do with the config. **Nothing in the host's `context/topics/` is touched by an upgrade.**
+
+**Pattern-owned, replaced wholesale:** `scripts/contextctl.py` and `context/README.md`. Copy both from the new
+`skeleton/`, byte for byte. A local patch to the runner is a second implementation, and the next release cannot be
+applied over it - if the host needs its own rules, they go in `extra_checks` under its own `scripts/`.
+
+**Host-owned, never copied:** `context.config.json`, the entry file's marked block, `MEMORY.md`, `MUST-KNOW.md`,
+`.gitignore`, and everything under `context/topics/`.
+
+**Then read the new config keys, and add only the ones the host needs.** A release that adds a key names its default
+in its `LOCKED.md` entry; a host that never sets it gets the default, and a host that needs another value sets it
+once. In 1.2.0 that key is **`archive_dir`** - where a drained topic's files live, `context/archive/` unless the host
+already archives elsewhere.
+
+**If the host drained a topic before this release**, it has a shim: a folder under `topics/` holding a `README.md`
+that names the archive and a date. Three choices, in order of preference:
+
+1. **Move to an address** - delete the shim folder, point its register row's first cell at the archive folder, and
+   keep the row's date as the day the receipt was checked. Two edits and one deletion. Put a two-line `README.md`
+   in the archive folder first if it does not have one.
+2. **Keep the shim** - 1.2.0 accepts it. The cost is that the tree still counts a receipt as a topic in `register`
+   and `briefs`, which is the count the release exists to fix.
+3. **Defer** - correct only if the host has no drained topics, which `register`'s summary tells you: `K drained`.
+
+Whichever the host chooses, the shim's `Verified:` must **start a line** - `> last-updated … · Verified: …` is a
+finding from 1.1.1 onward, because a date the gate cannot read is a date nobody checked.
+
+**Verification is a comparison, not a pass.** Run `check --all` before the swap and after it, and read the summary
+line rather than the exit code: a release that fixes a silent skip *raises* findings, and a run that goes from
+`4 advisory` to `6 advisory` while staying blocking-free is the fix working. Then run `check --only installed` to
+prove the entry block survived, and `python -m unittest` only if the host keeps a copy of the suite.
+
 ## The failure modes this runbook exists to prevent
 
 | Failure | What it looks like |

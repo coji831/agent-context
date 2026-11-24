@@ -48,6 +48,7 @@ DEFAULTS = {
     "root_rules": "context/MUST-KNOW.md",
     "index_of_topics": "context/topics/INDEX.md",
     "topics_dir": "context/topics",
+    "archive_dir": "context/archive",
     "entry_file": "AGENTS.md",
     "shells": [],
     "port_target": None,
@@ -118,6 +119,11 @@ def load_config(root: Path, explicit: str | None) -> tuple[dict, list[str]]:
         module_name, _, function_name = str(spec).partition(":")
         if not module_name.strip() or not function_name.strip():
             problems.append(f'extra_checks: "{spec}" is not "module:function"')
+    archive = str(cfg.get("archive_dir") or "").strip("/")
+    topics = str(cfg.get("topics_dir") or "").strip("/")
+    if archive and (archive == topics or archive.startswith(topics + "/")):
+        problems.append(f'archive_dir "{archive}" is inside topics_dir "{topics}"; every gate scopes to '
+                        "topics_dir, so an archive there reads as a live topic")
     return cfg, problems
 
 
@@ -447,22 +453,59 @@ def zero(gate: str, where: str, what: str, exists: bool = True) -> Result:
 # ---------------------------------------------------------------------- the gates
 
 
+def archive_root(ctx: Ctx) -> str:
+    """The archive root as a register row writes it: no leading or trailing slash."""
+    return str(ctx.cfg.get("archive_dir") or "context/archive").strip("/").rstrip("/")
+
+
+def row_target(ctx: Ctx, raw: str) -> tuple[str, str]:
+    """("live" | "drained", name) for a register row's first cell.
+
+    A live row names a folder under `topics_dir`; a drained row names a folder under `archive_dir`. A bare
+    name reads as live, so a register written before addresses existed still resolves.
+    """
+    address = raw.strip("`").strip().rstrip("/")
+    for kind, prefix in (("live", ctx.rel(ctx.topics_dir).rstrip("/")), ("drained", archive_root(ctx))):
+        if address == prefix or address.startswith(prefix + "/"):
+            return kind, address[len(prefix):].strip("/")
+    return "live", address.split("/")[-1]
+
+
 def gate_register(ctx: Ctx) -> Result:
     gate = "register"
     index = ctx.root / ctx.cfg["index_of_topics"]
     folders = {topic.name: topic for topic in ctx.topics}
+    archive = archive_root(ctx)
     text = ctx.read(index)
     rows = []
     findings = []
+    drained = 0
     if text is None:
         findings.append(Finding(gate, ctx.rel(index), None, "register file not found"))
     else:
         for number, cells in table_rows(text.splitlines()):
             raw = cells[0].strip("`").strip()
-            name = raw.rstrip("/").split("/")[-1]
             when = cells[-1].strip("`") if len(cells) > 1 else ""
-            rows.append((number, name, raw, when))
-    for number, name, raw, when in rows:
+            rows.append((number, raw, when))
+    for number, raw, when in rows:
+        kind, name = row_target(ctx, raw)
+        if kind == "drained":
+            drained += 1
+            if not name:
+                findings.append(Finding(gate, ctx.rel(index), number,
+                                        f'row names "{raw}", the archive root itself, which is not a topic'))
+                continue
+            if not (ctx.root / archive / name).is_dir():
+                findings.append(Finding(gate, ctx.rel(index), number,
+                                        f'row names "{raw}", an archive folder that does not exist'))
+            if not when:
+                findings.append(Finding(gate, ctx.rel(index), number,
+                                        f'drained row "{name}" has no date; a receipt needs the day it was checked'))
+            if name in folders:
+                findings.append(Finding(gate, ctx.rel(index), number,
+                                        f'drained row "{name}" also has a folder under {ctx.rel(ctx.topics_dir)}; '
+                                        "the drain deletes it - a receipt and a live topic cannot share a name"))
+            continue
         if name not in folders:
             findings.append(Finding(gate, ctx.rel(index), number, f'row names "{raw}", no such folder'))
             continue
@@ -480,19 +523,20 @@ def gate_register(ctx: Ctx) -> Result:
         if when and when != verified:
             findings.append(Finding(gate, ctx.rel(index), number,
                                     f"row date {when} differs from {name}/README.md Verified: {verified}"))
-    seen: dict[str, list[int]] = {}
-    for number, name, _, _ in rows:
-        seen.setdefault(name, []).append(number)
-    for name, numbers in seen.items():
+    seen: dict[tuple[str, str], list[int]] = {}
+    for number, raw, _ in rows:
+        seen.setdefault(row_target(ctx, raw), []).append(number)
+    for (kind, name), numbers in seen.items():
         if len(numbers) > 1:
-            findings.append(Finding(gate, ctx.rel(index), numbers[1], f'duplicate rows for "{name}"'))
+            findings.append(Finding(gate, ctx.rel(index), numbers[1],
+                                    f'duplicate {kind} rows for "{name}"'))
     for name, topic in sorted(folders.items()):
-        if name not in seen:
+        if ("live", name) not in seen:
             findings.append(Finding(gate, ctx.rel(topic.dir), None, "folder has no row; add one dated row"))
     count = len(rows) + len(folders)
     if count == 0:
         return zero(gate, ctx.rel(index), "rows and folders", ctx.topics_dir.is_dir())
-    return Result(gate, findings, count, f"{len(folders)} folders, {len(rows)} rows")
+    return Result(gate, findings, count, f"{len(rows)} rows, {len(folders)} folders, {drained} drained")
 
 
 def gate_leaf_index(ctx: Ctx) -> Result:

@@ -15,11 +15,12 @@ contradicts one, the release is wrong.
 | Does a topic with fewer than four artefacts still hold the argument? | **One `README.md` is enough.** The test is one home and one mutability per artefact that exists, never the count. `skeleton/context/README.md` already says a one-leaf topic needs only `README.md`. |
 | May a `JOURNEY` entry hold reasoning? | **Yes.** An entry records what happened during the turn, reasoning included. It is never corrected, so it records what was thought, not what is true - and nothing loads it. |
 | Is a capture buffer part of the mechanism? | **No, not yet.** The case is not needed, and the home a routing row would name exists in no file. A thought that cannot be filed yet has no home and is not durable. `inbox.md` stays undesigned, with nothing routing to it. |
-| Where does a drained topic's archive live? | **`context/archive/`, at the tree root**, flat, files prefixed with the topic name. **Never under `topics/`**: every gate scopes to `topics_dir`, so an archive there reads as a live topic and fails `register` and `leaf-index` on a *correct* drain. |
+| Where does a drained topic's archive live? | **A folder per topic under `archive_dir`** - `context/archive/<topic>/` by default, set once in config. **Never under `topics/`**: every gate scopes to `topics_dir`, so an archive there reads as a live topic and fails `register` and `leaf-index` on a *correct* drain. The default is `[policy]`; the register row names the folder the host actually used, so a host that archives elsewhere is not lying. |
+| Does a drain leave a shim? | **No.** The register row carries the two things a shim carried - the archive folder and the date the receipt was checked - and the archive folder carries two lines introducing itself. Measured before the change, 2026-11-24: two shims on one host produced three unreadable `Verified:` lines and a `register` count of `9 folders, 9 rows` for seven topics, while `briefs` divided by nine. 1.2.0 accepts the shim form as well, so no host has to migrate in the same commit as its upgrade; the gate simply stops *needing* one. A legacy shim still needs a line-start `Verified:` from 1.1.1 onward, or it is a finding. |
 | Which harness holds the canonical copy of the rules? | **The highest-ranked harness present is the port target** - Claude on a Claude+Copilot repo, Copilot on a Copilot-only repo. A declared primary overrides this only on an explicit owner decision. |
 
 **One consequence worth stating.** The archive ruling is correct because of a property worth making deliberate:
-`context/archive/` is invisible to every gate *because* they scope to `topics_dir`. That was true by
+the archive root is invisible to every gate *because* they scope to `topics_dir`. That was true by
 construction and is now tested in both directions, so a later refactor cannot quietly move the scan root.
 
 ### The operation
@@ -51,6 +52,35 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | Question | Ruling |
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
+
+## 1.2.0 - the drain that leaves no folder
+
+**1.2.0, 2026-11-24.** 1.1.1 made a gate report what it could not read. This release removes the artefact that
+made the reading necessary. Until now a drain rewrote the topic `README.md` into a **shim** and left the folder in
+place, so the tree's own counts could not tell a receipt from a live topic: on a host running 1.1.0, `register`
+reported `9 folders, 9 rows` for seven topics and two receipts, and `briefs` divided by nine for a denominator of
+seven. A shim is the only artefact that can look live, so the fix is to remove it rather than to mark it.
+
+**The direction came from the owner, 2026-11-24:** *draining should leave no trail except the INDEX row - everything
+moves to the archive, so nothing is lost.* Rolling the index to stop it growing is wanted and deliberately not built
+here: a row is the only pointer, so a roll must compress prose and never drop an address.
+
+| Was | Is |
+| --- | --- |
+| a drain rewrote `README.md` into a shim naming the path, what moved and the date checked, and kept the folder | a drain **deletes the folder**; the register row becomes an **address** - first cell the archive folder, date the day the receipt was checked - and both cells are checked |
+| the archive was one flat folder of `<topic>-<original name>` files, which existed so a shim could point at individual files | **one folder per topic**, `archive_dir/<topic>/`, named as the topic was, with a two-line `README.md` introducing itself; the prefix scheme retires with the shim that needed it |
+| `context/archive/` was a `[policy]` default with no config key | **`archive_dir`** in the config, defaulting to `context/archive`; a value inside `topics_dir` is a config error (exit 2), because every gate scopes there |
+| a register row could only name a folder under `topics_dir` | a row is **live** or **drained**: live checks the folder and the `Verified:` date; drained checks the archive folder exists, has a date, and does not share a name with a live topic |
+| the summary read `1 folders, 1 rows` | `1 rows, 1 folders, 0 drained` - the receipt count is visible instead of implied |
+
+**Both forms are accepted.** 1.2.0 passes a host that still shims, so a runner swap and a migration need not land in
+the same commit; the shim form is not deprecated by a gate, it is simply no longer produced. A host that drains after
+this release gets the address form, and one that drained before it can keep its shim or move to an address - the
+second is two edits and a deletion.
+
+**Tests: 107 before, 113 after.** Six: an address row passes every gate; an address naming a missing archive folder
+fails; a drained row with no date fails; a receipt and a live topic sharing a name fails; `archive_dir` is honoured
+when a host sets another root; and an `archive_dir` inside `topics_dir` exits 2.
 
 ## 1.1.1 - the input nobody read
 
@@ -414,7 +444,7 @@ measurement rules out is a cadence argument built on startup time.
 
 | Change | Detail |
 | --- | --- |
-| drain names its destination | `context/archive/` at the tree root, flat, prefixed with the topic name; tested in both directions - outside every gate's scan when it is there, two blocking findings when it is put under `topics/` |
+| drain names its destination | `context/archive/` at the tree root, flat, prefixed with the topic name; tested in both directions - outside every gate's scan when it is there, two blocking findings when it is put under `topics/`. **1.2.0 moved this to one folder per topic under `archive_dir`, named in the register row - see that release above** |
 | `briefs` calibrated | 0.82, from 49 measured pairs. 26 hard negatives max at **0.649**; rephrased duplicates score **0.4-0.6**. The gate therefore catches near-verbatim copies only, which is the deliberate trade: lose a duplicate rather than fire on a true tree |
 
 ### Publication: five defects

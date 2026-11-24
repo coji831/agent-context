@@ -19,7 +19,7 @@ to a human when they matter. *Cadence* says where a gate *belongs*, so a host wi
 
 | Set | Gate | Where | Assertion (one sentence) | Failure it catches (a shape, not a risk) | Finding it prints | Cadence | Posture | Rated |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| default | `register` | both | Every folder under `topics_dir` has exactly one row in `index_of_topics`, every row names a folder that exists, and each row's date equals that topic `README.md`'s `Verified:` date - and a `Verified:` the gate cannot read (no line starting with it) is a finding, never a skip. | A topic on disk the register does not name; a row still pointing at a folder deleted at drain; a topic re-read while its register row keeps the old date; a shim whose date sits at the end of a line, which used to make the row's date go unchecked in silence. | `FAIL register context/topics/INDEX.md:9: row names "pricing/", no such folder`; `FAIL register context/topics/INDEX.md:9: widget/README.md has no "Verified:" line at the start of a line, so this row's date was not checked` | commit | gate | must |
+| default | `register` | both | Every **live** folder under `topics_dir` has exactly one row in `index_of_topics`, and every row is one of two forms: **live** - its first cell names a folder under `topics_dir` that exists, and its date equals that topic `README.md`'s `Verified:` - or **drained** - its first cell names a folder under `archive_dir` that exists, with the date the receipt was checked, and no folder of the same name under `topics_dir`. A `Verified:` the gate cannot read (no line starting with it) is a finding, never a skip. | A topic on disk the register does not name; a row still pointing at a folder deleted at drain, or at an archive folder that is not there; a receipt whose date is missing, or that shares a name with a live topic; a topic re-read while its register row keeps the old date; a shim whose date sits at the end of a line, which used to make the row's date go unchecked in silence. | `FAIL register context/topics/INDEX.md:9: row names "pricing/", no such folder`; `FAIL register context/topics/INDEX.md:9: row names "context/archive/pricing/", an archive folder that does not exist`; `FAIL register context/topics/INDEX.md:9: widget/README.md has no "Verified:" line at the start of a line, so this row's date was not checked` | commit | gate | must |
 | default | `leaf-index` | both | Every `L-####-*.md` names a row in its nearest index (the topic `## Leaves`, or its family `README.md`), and every row names a file that exists. | A leaf written and never indexed, so no later session knows it exists; a row whose leaf was deleted instead of rewritten. | `FAIL leaf-index context/topics/widget/L-0003-x.md: no row in context/topics/widget/README.md` | commit | gate | must |
 | default | `shape` | both | Fixed shapes hold: a leaf's frontmatter (or its first two lines) carries `id:` and `brief:`; every `HANDOFF.md` carries `## Now`; every register and `## Leaves` row carries a date and a brief; every `decisions.md` row carries a `D-####` id; each `MEMORY.md` entry is one line. A missing `id` is reported **in the terms of the `leaf_pattern` in force** - `id: L-####` for the default, the configured pattern for a host that overrides it - and the message always names the two legal forms: the pattern's match, or the file stem. | A leaf that cannot be cited by id; a handoff whose next session has no first action; a decision row nothing can cite; a fact that grew a body under its bullet; and a host told to add an id shape its own config says it does not use. | `FAIL shape context/topics/widget/HANDOFF.md: no "## Now" heading; the next session has no first action` | commit | gate | should |
 | default | `caps` | both | Every count is inside its configured cap: `HANDOFF.md` lines, `MUST-KNOW.md` rules and rule characters, `MEMORY.md` lines, leaf lines, topic `README.md` lines, and fan-out (more than 10 rows needs a family index). | A handoff grown to a thousand lines with the real next step at its end; a topic README listing thirty leaves flat. | `FAIL caps context/topics/widget/HANDOFF.md: 214 lines, max 90; move the history to JOURNEY.md and rewrite the snapshot` | milestone | gate | should |
@@ -116,7 +116,7 @@ invisible by construction - a placeholder is a legal comment whose absence of ru
 | Whether a host-supplied requirement record (a spec, a locked brief) was edited | It is not an artefact of this tree, so no file here can be compared against it; `ask` holds that rule. |
 | Whether two copies of one rule agree (root and topic `MUST-KNOW`, block and contract) | An equality a reader resolves by the stated dispute order; a gate would have to know which copy is authority, which is the judgement it would be making. |
 | Whether a filled shell's body still matches the block | The `ported:` decision above; the marker dates the copy and a human compares it when a disagreement surfaces. |
-| Whether a drained topic's shim names the path and the date checked | The contract asks for both, and a shim is prose a human writes once at drain; a missing date is caught by the next reader, not by a shape. |
+| Whether a drained topic's archive holds what it should | The row checks that the folder exists and carries a date; which leaves went into it is a judgement made at drain, and no shape separates a complete archive from a partial one. |
 | Whether a row names the *right* folder, or a pointer the *right* file | Resolution is not correctness: the shape check answers only whether the path exists. |
 | Whether a `## Now` is a good next step | `shape` checks that the heading is present and says so; quality has no shape. |
 | Whether a topic belongs to this tree rather than another | Value 6: `resolve --where` answers it as a question, and the honest answer is sometimes two entries. |
@@ -187,9 +187,12 @@ fell by 130, and that was new leaves over the cap, which is what a growing tree 
 ## The config surface
 
 Keys the gate set requires, and nothing else. Paths: `memory`, `root_rules`, `index_of_topics`,
-`topics_dir`, `entry_file`, `shells`, and `port_target` (the one shell holding the body; the rest are
-pointers). Budgets: `artefacts` and `root_artefacts` entries carrying `max_lines`, `max_rules`,
-`max_rule_chars` and `requires`; plus `leaves.max_lines` and `briefs.threshold`. **Leaf naming:**
+`topics_dir`, `archive_dir`, `entry_file`, `shells`, and `port_target` (the one shell holding the body; the rest
+are pointers). **`archive_dir`** (default `context/archive`) is where a drained topic's folder lives: a register
+row whose first cell names a folder there is a **receipt**, checked for existence and a date, and a value inside
+`topics_dir` exits **2** because every gate scopes there. Budgets: `artefacts` and `root_artefacts` entries
+carrying `max_lines`, `max_rules`, `max_rule_chars` and `requires`; plus `leaves.max_lines` and
+`briefs.threshold`. **Leaf naming:**
 `leaf_pattern` (default `"^L-\\d{4}"`), the regular expression, matched against a file name under
 `topics_dir`, that decides what a leaf is - a host whose notes are `01-scheduler.md` sets `"^\\d{2}-"` and
 its leaves stop being invisible. It must match leaf files only: whatever it matches is read for an `id` and
@@ -249,7 +252,7 @@ the old path. Either way `context/topics/INDEX.md` line 9 says `pricing/` and no
 ```
 $ contextctl check
 installed    ok    4 of 4 shells filled, entry block present
-register     FAIL  13 folders, 13 rows
+register     FAIL  13 rows, 13 folders, 0 drained
   context/topics/INDEX.md:9: row names "pricing/", no such folder
 leaf-index   ok    12 topics, 27 leaves
 shape        ok    41 files
@@ -259,8 +262,8 @@ caps         ok    41 files
 
 Exit 1. **Two legitimate responses.** *Fix the cause:* decide which copy is stale. If the row is right, the
 folder was renamed, and the row is repointed and re-dated - one `act`, the turn the rename happened. If the
-folder is right, the drain finished, and the row becomes the drained row naming the shim's path and the date
-checked - an `owner` write, T5. *Make it advisory on purpose:* `"checks_advisory": ["register"]` in
+folder is right, the drain finished, and the row becomes an **address** - its first cell the archive folder, its
+date the day the receipt was checked - an `owner` write, T5. *Make it advisory on purpose:* `"checks_advisory": ["register"]` in
 `context.config.json`, with a `decisions.md` row saying why - a register written by another tool and lagging
 one commit, say. The gate keeps printing; it stops blocking. There is no inline ignore, so silencing is
 always a config entry plus a recorded reason, the shape `LOCKED.md` records for every other decision here.
