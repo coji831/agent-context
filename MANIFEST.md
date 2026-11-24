@@ -83,7 +83,7 @@ What each vendor calls them, verified 2026-11-07; a blank is "not documented her
 
 | Job | Copilot | Claude Code | Cursor | Codex | Windsurf |
 | --- | --- | --- | --- | --- | --- |
-| **always loaded** | `AGENTS.md`, `.github/copilot-instructions.md` | `CLAUDE.md` *or* `AGENTS.md`; plus auto memory | `AGENTS.md`, or an always-apply `.mdc` | `AGENTS.md` root -> cwd, 32 KiB cap; `~/.codex/AGENTS.md` global | unverified |
+| **always loaded** | `AGENTS.md`, `.github/copilot-instructions.md` | `CLAUDE.md` *or* `AGENTS.md`; plus auto memory | `AGENTS.md`, or an always-apply `.mdc` | `AGENTS.md` root -> cwd, 32 KiB cap; `~/.codex/AGENTS.md` global | unverified | <!-- leaks:ok -->
 | **scoped at write time** | `*.instructions.md` + `applyTo` glob | `.claude/rules/` + `paths:` globs | `.mdc` + `globs` / `description` | **directory placement** - `context/AGENTS.md`, which this tree declines to ship | unverified |
 | **procedure on demand** | `.github/skills/<n>/SKILL.md` | `.claude/skills/<n>/SKILL.md`; `.claude/commands/` merged in | none documented as a skill; a `description`-only rule is nearest | `<n>/SKILL.md` - metadata visible, body on use | unverified |
 | **manual invoke** | the skill's name | `/skill-name` | `@rule-name` | skill by name; custom prompts | unverified |
@@ -177,7 +177,7 @@ grep instead of a silent empty rule file.
 
 ## The gate set, decided elsewhere
 
-**`GATES.md` holds it**, and `skeleton/scripts/contextctl.py` runs it: four gates block on `check`, four more
+**`GATES.md` holds it**, and `skeleton/scripts/contextctl.py` runs it: four gates block on `check`, five more
 on `check --all`, and `installed` guards the install this document describes. A host's **own** rules attach
 through `extra_checks` (`"module:function"`, resolved from the host's `scripts/`) and run under the same
 `--all`, which is how a repo keeps the checks it wrote for itself. This file decides what lands

@@ -32,7 +32,7 @@ Three corollaries, each also bought:
 ### 2. Nothing points outside this repository
 
 > Every path, SHA, tag, issue number and URL in prose, code fences, YAML and comments must resolve **inside this
-> repo at HEAD**. Forbidden: absolute paths (`C:\`, `/Users/`, `/home/`), `~/`, `..` that escapes the repo, a
+> repo at HEAD**. Forbidden: absolute paths (`C:\`, `/Users/`, `/home/`), `~/`, `..` that escapes the repo, a <!-- leaks:ok -->
 > sibling checkout, "see my other repo".
 
 - A SHA must satisfy `git cat-file -e <sha>`, and the commit subject is quoted beside it.

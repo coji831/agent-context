@@ -38,13 +38,14 @@ construction and is now tested in both directions, so a later refactor cannot qu
 
 | Question | Ruling |
 | --- | --- |
-| What is the gate set? | **Eight gates plus `installed`, four of them default.** Each guards an `act`; none guards an `ask` or an `owner` trigger, because those are questions put to a human, not findings. |
+| What is the gate set? | **Nine gates plus `installed`, four of them default.** Each guards an `act`; none guards an `ask` or an `owner` trigger, because those are questions put to a human, not findings. |
 | What is the one exception to off-by-default? | **`installed`**, host only, rated once, disabled in this repo with the reason recorded. It judges whether the tree arrived, not what it says, and it refuses `--skip` because it is the precondition of every other denominator. |
 | What counts as zero subjects? | **A count, not a verdict, unless the location is absent.** `FAIL` when the config points where the tree has nothing; `ok` with the count printed when the location exists and is legitimately empty. Failing both made an install report four blocking findings before its first topic. |
 | What is the `briefs` similarity threshold? | **0.82.** Measured on 49 pairs: 26 hard negatives (one topic, different conclusions) max at **0.649**; rephrased duplicates score **0.4-0.6**. So 0.82 fires on zero negatives and catches near-verbatim copies only. Losing a duplicate is preferred to firing on a true tree. |
 | Does `verified` block on an uncommitted leaf? | **Yes, and that is accepted.** The only fix left is guessing a date from the working tree, and an uncommitted leaf has no history. A commit clears it. |
 | Is there a document length budget? | **No.** Per-document budgets were tried and retired with their arithmetic, and the aggregate with them. The documents answer one question each and are longer than a guess made before they existed; merging to hit a number puts two subjects in one file. What stays budgeted is the **always-loaded surface**: `664 B` entry file, of which the injected block is `625 B`. |
 | What does a gate do with a topic it cannot read? | **It reports it.** A `README.md` with no line starting `Verified:`, or none at all, is a finding in both `register` and `verified`; a subject the gate cannot read is never dropped from the set in silence. |
+| What is the scope of `leaks`? | **The memory tree by default (`context`), and the host widens it.** A host sharing its repo with client code gets a wall of findings from a whole-repo scan; this repo scans `.` because its product is prose. The scope is a `[policy]` in config, the rule is not. |
 | Which harness behaviours are still unverified? | **A verification plan exists for the two most common harnesses**, Claude Code and Copilot in VS Code. Windsurf and Codex stay queued; no path is guessed into a host. |
 
 ### The history
@@ -52,6 +53,37 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | Question | Ruling |
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
+
+## 1.3.0 - the pointer class, finally gated
+
+**1.3.0, 2026-11-24.** `CONTRIBUTING.md` rule 2 says nothing points outside this repo. Two releases broke it -
+1.0.3 cited a file and a commit this repo never held, and 1.0.8 pointed at another checkout's topic and leaf
+number - and 1.1.0 recorded the gate that would catch it as deliberately left for the owner's word. This is that
+gate, built on the owner's word of 2026-11-24.
+
+**What it checks, and what it refuses to.** `leaks` scans the configured text files for backticked citations that
+leave the tree: an absolute path (`C:\`, `/Users/`, `/home/`, `/root/`), a home-relative one (`~/`, `$HOME/`), and <!-- leaks:ok -->
+a parent-relative citation that resolves outside the root *from the citing file's own directory* <!-- leaks:ok -->
+- which is why the same form is legal inside the contract and illegal at the root. It also flags any term on the
+host's own deny file, untracked because a list of the names a host must not leak is itself a leak. Its OK line
+prints files, terms and exemptions, so the blind surface is a number rather than an assumption.
+
+**Existence is not part of it, and that is measured.** A blanket "every backticked path must resolve" was tried
+first: **299 of 641** backticked file paths in this repo fail it, and almost all are correct, because `ADOPT.md`
+and the contract describe *another* tree where `MEMORY.md` and `scripts/contextctl.py` are that host's paths. So
+`pointers` keeps the existence check for the four files where a citation is tree-root-relative by convention, and
+`leaks` checks the classes that are wrong in every tree.
+
+| Was | Is |
+| --- | --- |
+| no gate for the pointer class; `release-verify` ran two greps by hand before a tag | **`leaks`**, opt-in, over `leaks.roots` (default `context`), printing `N files, M deny terms, K lines exempt` |
+| a rule that quotes a forbidden form looked exactly like a violation of it | the **`leaks:ok`** marker skips that line and the count appears in the OK line; this repo carries 15, each a deliberate statement - the rule texts, the gates that document the forms, one harness fact, two historical records, and the tests that prove the finding |
+| the deny-list had nowhere to live | **`.leaks-deny.txt`**, gitignored in `skeleton/.gitignore`, read when present; absent prints `0 deny terms` rather than silence |
+| the gate set was nine names, so a tenth moved every denominator printed in a doc | the summaries, tests and documentation moved together: `5 of 10`, `10 of 10`, `11 of 11` with one host check |
+
+**Tests: 113 before, 121 after.** Eight: an absolute citation, a home-relative one, a parent-relative citation that
+escapes, one that stays inside, the marker and its count, a deny term, an absent deny file counted, and a scope that
+does not exist.
 
 ## 1.2.0 - the drain that leaves no folder
 
@@ -134,7 +166,8 @@ came back that no gate had made:
 instruction files are context and not enforcement (Claude Code: *"They aren't enforced configuration"*; VS Code:
 *"They don't guarantee compliance or replace tests, code review, or security controls"*). So these artefacts
 define what **done** means; they cannot make a claim true. The gate that would is named in § *Still open* below,
-and it is the one item this release deliberately leaves for the owner's word.
+and it is the one item this release deliberately leaves for the owner's word. **Built in 1.3.0 - see that
+release above.**
 
 **Tests: 103 before, 103 after.** The suite asserts no prose, and this release adds no code.
 
@@ -252,7 +285,7 @@ is a gate that reported a fact about its own parsing rather than about the tree 
 | Was | Is |
 | --- | --- |
 | `table_rows()` harvested a `Leaf` header as a data row, and `leaf-index`, `shape` and `briefs` read leaf names from **`cells[1]`** whatever the header said. On the host that is **76 of 109** findings - one prose table counted twice, with no true positive available | a header row is the row line a **separator** follows and is never a body row; the leaf column is the header that names a file (`Leaf`, `Leaves`, `File`), with `id` used only when none does, and `id \| Leaf \| Brief` as the fallback when no header is recognised. A **family** README is an index only if its first table names a file column; with no such table it has no index and contributes nothing |
-| `pointers` reported `repos/...` and `state/...` (real directories, `/`-anchored in `.gitignore`, absent from every clone) and `~/...` citations as dead, with no way to accept them: **22 permanent false findings** | `accepted_absent` takes paths, prefixes and globs; a matching citation is accepted and the summary prints how many (`..., 22 accepted absent`); an entry that matches no citation is itself a finding; `~/` and `$HOME/` are always accepted with no config |
+| `pointers` reported `repos/...` and `state/...` (real directories, `/`-anchored in `.gitignore`, absent from every clone) and `~/...` citations as dead, with no way to accept them: **22 permanent false findings** | `accepted_absent` takes paths, prefixes and globs; a matching citation is accepted and the summary prints how many (`..., 22 accepted absent`); an entry that matches no citation is itself a finding; `~/` and `$HOME/` are always accepted with no config | <!-- leaks:ok -->
 | leaf naming was the hardcoded `^L-\d{4}`, so on a host whose notes are `NN-name.md` **two gates measured nothing** and `verified` printed `ok 11 dated topics, 0 leaves without history` | `leaf_pattern` (default `"^L-\\d{4}"`) builds the matcher in one place; a `topics_dir` holding files and no leaf reports `leaf_pattern "^L-\d{4}" matches none of 115 files under context/topics; the leaf gates checked nothing` |
 | config names were validated **before** gate selection, so `check --only installed` exited 2 with seven errors - the install proof `ADOPT.md` step 6 tells an adopter to run | `--only installed`, run alone, prints each ignored name with `note:` and runs; every other invocation keeps today's strictness |
 | `extra_checks` was checked as a list of gate names, so a host's three own rules were refused and the coverage its retired checker was retired into became unreachable | `extra_checks` takes `"module:function"`, resolved from the host's `scripts/`, and runs under `--all`; a missing module, a missing function and a raising function are findings, never tracebacks |
@@ -316,7 +349,7 @@ act-inventory of the release; the sweep's denominator is below it.
 | `MECHANISM.md` Q1 answered "no" with *do the work, write nothing durable, say so* - contradicting the ruling that a decision with no owning topic creates it in that turn with its register row, and contradicting `T1` two screens below it | the routing table is the authority: a fact spanning topics is a `MEMORY.md` line, and a decision with no topic creates it with its row. The restatement is replaced by the reference, the fix used at `git mv` in 1.0.1 |
 | three hook examples wired `contextctl.py brief` with no marker in the file a host copies; only `port/hooks/README.md` and `port/blocks/hook-commands.md` said the command is not shipped | every hook JSON carries the marker, so the shape cannot be mistaken for a working command by a reader who copied it |
 | `AGENTIC-SYSTEM.md` cited `agent/WIRING.md`, "still readable from `54ba837`" - neither that file nor that commit exists in this repository | the pointer is gone and its one claim kept |
-| `port/hooks/README.md` pointed at `../copilot/hooks/`, a folder this repo does not ship | it points at `copilot-vscode-hooks.json`, which exists |
+| `port/hooks/README.md` pointed at `../copilot/hooks/`, a folder this repo does not ship | it points at `copilot-vscode-hooks.json`, which exists | <!-- leaks:ok -->
 | `GATES.md` quoted a register line as `1 finding (13 folders, 13 rows)` and a pointers line as `88 tokens in 9 files` | both match what the tool prints: `13 folders, 13 rows`, and `88 cited paths in 9 files` |
 
 ### The depth-1 claim was wrong, and 1.0.6 is its first observation

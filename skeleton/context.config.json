@@ -5,6 +5,7 @@
   "index_of_topics": "context/topics/INDEX.md",
   "topics_dir": "context/topics",
   "archive_dir": "context/archive",
+  "leaks": {"roots": ["context"]},
   "entry_file": "AGENTS.md",
   "shells": [
     ".github/instructions/context.instructions.md",

@@ -15,8 +15,8 @@ to every markdown file here, including `LOCKED.md`.
    the requirement: "requires full history" survives, "reports history unavailable" was false here for two
    releases.
 
-2. **Nothing points outside this repo.** Every path, SHA, tag and URL resolves at HEAD. No `C:\`, no `/Users/`,
-   no `/home/`, no `~/`, no `../` escaping the tree, no sibling checkout, no "see my other repo". A SHA needs
+2. **Nothing points outside this repo.** Every path, SHA, tag and URL resolves at HEAD. No `C:\`, no `/Users/`, <!-- leaks:ok -->
+   no `/home/`, no `~/`, no `../` escaping the tree, no sibling checkout, no "see my other repo". A SHA needs <!-- leaks:ok -->
    `git cat-file -e`. Cite path plus heading; line numbers rot. **A measurement transfers; a pointer does not** -
    you may state a number you measured elsewhere, never where the work lives.
 

@@ -34,25 +34,34 @@ one loudly, and that refusal is a passing result here, not a failure.
 
 ## 3. No pointer leaves the repo
 
-The class of defect this repo has shipped twice, and no gate catches it yet.
-
-Two greps. The first is structural and the same for everyone:
+The class of defect this repo has shipped twice. **`leaks` gates most of it** (opt-in, so run `--all`):
 
 ```bash
-git grep -n -E '(/Users/|/home/|~/|\.\./)' -- .
+python skeleton/scripts/contextctl.py check --all --only leaks
+```
+
+It reports an absolute or home-relative citation, a parent-relative one that resolves outside the root from the
+citing file's directory, and any term from `.leaks-deny.txt`. A line that names an outside thing **on purpose** -
+a rule quoting the forbidden forms, a harness fact, a historical record - carries the `leaks:ok` marker, and the OK
+line prints how many lines carry it, so the exempt surface is a number rather than an assumption.
+
+**What the gate does not check, and you do:** whether an in-tree citation in arbitrary prose *exists*. A document
+about another tree legitimately names paths that are absent here - measured at 299 of 641 in this repo - so this
+grep is the release's job:
+
+```bash
 git grep -n -E '`[^`]*/[^`]*`' -- '*.md'
 ```
 
-Every hit in the second must resolve inside this repo. A path that does not is a finding.
+Every hit must resolve inside this repo. A path that does not is a finding.
 
-The second grep is **yours, and it must not be committed.** Pointers name the author's other work - a checkout
-they had open, a private repo, a desk. Those names are per-contributor, so put them in a file git never tracks,
-and keep the file out of every diff:
+**The deny-list is yours, and it must not be committed.** Pointers name the author's other work - a checkout they
+had open, a private repo, a desk. `leaks` reads `.leaks-deny.txt` at the root, one term per line, and
+`skeleton/.gitignore` keeps it out of every diff:
 
 ```bash
-# one term per line; .git/info/ is local and untracked by design
-printf '%s\n' <the names of the repos you have open> > "$(git rev-parse --git-dir)/info/foreign-terms"
-git grep -n -i -F -f "$(git rev-parse --git-dir)/info/foreign-terms" -- .
+printf '%s\n' <the names of the repos you have open> > .leaks-deny.txt
+python skeleton/scripts/contextctl.py check --all --only leaks
 ```
 
 **Empty is the only passing result.** Put those terms anywhere in the tree and the leak becomes permanent: a

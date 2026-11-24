@@ -11,7 +11,7 @@ because you read this file whether or not you read that one.
    in front of the sentence or delete it. Never describe behaviour under a condition you did not create - state
    the requirement instead.
 2. **Nothing points outside this repo.** Every path, SHA, tag and URL resolves at HEAD. No absolute paths, no
-   `~/`, no `../` escaping the tree, no sibling checkout, no "see my other repo". A SHA needs
+   `~/`, no `../` escaping the tree, no sibling checkout, no "see my other repo". A SHA needs <!-- leaks:ok -->
    `git cat-file -e <sha>`. Cite path plus heading, never line numbers. **A measurement transfers; a pointer
    does not.**
 3. **A number is derived, never typed.** A count that also exists in a table or a constant is generated from it

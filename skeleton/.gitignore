@@ -4,3 +4,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+# The names a host must not leak. Never committed: the list is itself the leak it prevents. `leaks` reads
+# it when it exists and prints `0 deny terms` when it does not.
+.leaks-deny.txt

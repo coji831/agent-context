@@ -133,7 +133,7 @@ The tree, the entry file, one folder per harness and the gate runner are here. W
   host copies one.
 
 `scripts/contextctl.py` runs the gates in [`GATES.md`](GATES.md) and moves no file: `check` runs the four
-default gates, `check --all` adds the four opt-in ones, and `context.config.json` names the paths and budgets
+default gates, `check --all` adds the five opt-in ones, and `context.config.json` names the paths and budgets
 they read. Gates run at a milestone or when the owner asks, never as a turn-end ritual. `VERSION` and
 `LOCKED.md` record the release this was taken from.
 

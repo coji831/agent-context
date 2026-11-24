@@ -25,16 +25,18 @@ to a human when they matter. *Cadence* says where a gate *belongs*, so a host wi
 | default | `caps` | both | Every count is inside its configured cap: `HANDOFF.md` lines, `MUST-KNOW.md` rules and rule characters, `MEMORY.md` lines, leaf lines, topic `README.md` lines, and fan-out (more than 10 rows needs a family index). | A handoff grown to a thousand lines with the real next step at its end; a topic README listing thirty leaves flat. | `FAIL caps context/topics/widget/HANDOFF.md: 214 lines, max 90; move the history to JOURNEY.md and rewrite the snapshot` | milestone | gate | should |
 | opt-in | `briefs` | both | No two leaves in **one topic** have `brief` lines above **0.82** similarity - calibrated 2026-11-08: 29 hard negatives (same topic, different conclusions) max at 0.649, so 0.82 leaves a 0.17 margin and fires on 0 of them. | Two leaves holding one conclusion, the second written instead of the first rewritten - **near-verbatim only**: a copy with a word changed scores above 0.9, a rephrasing scores 0.4-0.6 and is deliberately missed. | `FAIL briefs context/topics/widget/README.md:11: brief of L-0003 is 0.86 similar to L-0001` | CI | gate | could |
 | opt-in | `verified` | both | A topic `README.md`'s `Verified:` date is not older than the newest **git commit date** among the leaves it indexes (`git log -1 --format=%cs`), never a filesystem mtime - and a **shallow** clone is refused before any date is compared: `git rev-parse --is-shallow-repository` is asked first, and one blocking finding says no date was checked, because a depth-1 boundary commit has no parent and git reports it as the root commit that added every file. A topic `README.md` with no line starting `Verified:` is a finding, not a silent omission from the set. | A topic re-read and one leaf rewritten, while the entry still shows last month's date; a clone that would answer every leaf with the boundary commit's date and print no complaint; a topic dropped from the count because its date is unreadable. | `FAIL verified context/topics/widget/README.md:3: Verified: 2026-09-01, 41 days behind L-0002`; `FAIL verified context: the clone is shallow, so ... no date was checked`; `FAIL verified context/topics/widget/README.md: no "Verified:" line at the start of a line, so this topic was not dated` | CI (2.7 s at 80 leaves, 17.5 s at 500 - one git spawn each, measured 2026-11-08) | gate | could |
-| opt-in | `pointers` | both | Every backticked path in `MEMORY.md`, the root rules, the entry block and a topic `README.md` resolves from the tree root, unless it matches an `accepted_absent` entry or begins `~/` or `$HOME/`. | A citation to a file that moved, so a reader follows a dead pointer and trusts nothing after it. | `FAIL pointers context/MEMORY.md:12: "docs/runbook.md" does not resolve` | milestone | gate | should |
+| opt-in | `pointers` | both | Every backticked path in `MEMORY.md`, the root rules, the entry block and a topic `README.md` resolves from the tree root, unless it matches an `accepted_absent` entry or begins `~/` or `$HOME/`. | A citation to a file that moved, so a reader follows a dead pointer and trusts nothing after it. | `FAIL pointers context/MEMORY.md:12: "docs/runbook.md" does not resolve` | milestone | gate | should | <!-- leaks:ok -->
+| opt-in | `leaks` | both | No backticked citation in the scanned files leaves the tree - an absolute path, a home-relative one, or a `..` that resolves outside the root - and no term from the host's own untracked deny file appears on a line; a line carrying the `leaks:ok` marker is skipped and **counted in the OK line**. The **existence** of an in-tree citation in arbitrary prose is not checked: a document about another tree names paths that are absent here. | A pointer a reader cannot follow because it is on the writer's machine; a sentence naming a host whose identity was meant to stay out of the tree; a rule quoting a forbidden form and looking exactly like a violation of it. | `FAIL leaks context/MEMORY.md:12: "C:\docs\runbook.md" is an absolute or home-relative path; a citation must resolve inside this repo` | milestone | gate | should |
 | opt-in | `ported` | host only | Every path listed in `shells` carries a `ported: <YYYY-MM-DD>` line. | A filled rule shell with nothing dating it, so a human cannot rank it against the contract. | `FAIL ported .claude/rules/context.md:3: no "ported:" line` | milestone | gate | once |
 
 **A host that changes nothing gets the four default gates**, blocking, when it runs `contextctl check` at a
-milestone or on request, and **nothing else**: the opt-in four run only under `check --all` or
+milestone or on request, and **nothing else**: the opt-in five run only under `check --all` or
 `check --only <name>`. *Rated* is value against cost: **must** = the memory does not work without it,
 **should** = keeps the tree in shape, **could** = a gain smaller than the trust it costs, **once** = belongs
 at install or update, not on a loop. The smallest set that keeps the tree working is `register` +
 `leaf-index`; `shape` and `caps` earn their place by costing milliseconds; `pointers` is rated **should**
-and stays opt-in because it measured 16 false findings on a real consumer repo; nothing else earns a default run.
+and stays opt-in because it measured 16 false findings on a real consumer repo; `leaks` is opt-in because its
+scope is a policy a host sets, not a shape every tree shares; nothing else earns a default run.
 
 ### How a leaf index is read
 
@@ -117,6 +119,7 @@ invisible by construction - a placeholder is a legal comment whose absence of ru
 | Whether two copies of one rule agree (root and topic `MUST-KNOW`, block and contract) | An equality a reader resolves by the stated dispute order; a gate would have to know which copy is authority, which is the judgement it would be making. |
 | Whether a filled shell's body still matches the block | The `ported:` decision above; the marker dates the copy and a human compares it when a disagreement surfaces. |
 | Whether a drained topic's archive holds what it should | The row checks that the folder exists and carries a date; which leaves went into it is a judgement made at drain, and no shape separates a complete archive from a partial one. |
+| Whether an in-tree citation in arbitrary prose exists | Measured 2026-11-24: 299 backticked file paths in this repo do not resolve from the root, and almost all are correct - `ADOPT.md` describes *another* tree, so `MEMORY.md` and `scripts/contextctl.py` are host paths, not this repo's. `pointers` keeps the existence check for the four files where a citation is tree-root-relative by convention; `leaks` checks what is wrong in every tree. |
 | Whether a row names the *right* folder, or a pointer the *right* file | Resolution is not correctness: the shape check answers only whether the path exists. |
 | Whether a `## Now` is a good next step | `shape` checks that the heading is present and says so; quality has no shape. |
 | Whether a topic belongs to this tree rather than another | Value 6: `resolve --where` answers it as a question, and the honest answer is sometimes two entries. |
@@ -132,9 +135,9 @@ A gate must have a non-zero denominator: a gate that measures nothing reports su
 zero files has silently passed. Three obligations, and they bind the tool:
 
 1. **Every gate counts its subjects and prints the count in its OK line**: `ok leaf-index 12 topics, 27
-   leaves`; `ok pointers 88 cited paths in 9 files`. The summary's denominator is **all nine known names**
-   plus the `extra_checks` that ran, never the number that ran, so `check` says `5 of 9` and only `--all`
-   says `9 of 9` (or `10 of 10` with one host check): a ratio of one is no reading.
+   leaves`; `ok pointers 88 cited paths in 9 files`. The summary's denominator is **all ten known names**
+   plus the `extra_checks` that ran, never the number that ran, so `check` says `5 of 10` and only `--all`
+   says `10 of 10` (or `11 of 11` with one host check): a ratio of one is no reading.
 2. **Zero subjects is reported, and it blocks only where the location is absent**: `FAIL caps 0 artefacts;
    that location does not exist, and a gate that scanned nothing has not passed` is a misconfiguration, while
    `ok register 0 rows and folders - nothing here yet` is a fresh install or a drained topic and prints its
@@ -190,7 +193,11 @@ Keys the gate set requires, and nothing else. Paths: `memory`, `root_rules`, `in
 `topics_dir`, `archive_dir`, `entry_file`, `shells`, and `port_target` (the one shell holding the body; the rest
 are pointers). **`archive_dir`** (default `context/archive`) is where a drained topic's folder lives: a register
 row whose first cell names a folder there is a **receipt**, checked for existence and a date, and a value inside
-`topics_dir` exits **2** because every gate scopes there. Budgets: `artefacts` and `root_artefacts` entries
+`topics_dir` exits **2** because every gate scopes there. **`leaks`** takes an object: `roots` (default
+`["context"]` - the scope is a policy, and a host with code beside its memory points it there), `suffixes`
+(default the same nine text forms `pointers` understands), `deny_file` (default `.leaks-deny.txt`, **gitignored
+and never committed**: the names a host must not leak are themselves a leak), and `marker` (default `leaks:ok`).
+Budgets: `artefacts` and `root_artefacts` entries
 carrying `max_lines`, `max_rules`, `max_rule_chars` and `requires`; plus `leaves.max_lines` and
 `briefs.threshold`. **Leaf naming:**
 `leaf_pattern` (default `"^L-\\d{4}"`), the regular expression, matched against a file name under
@@ -204,8 +211,8 @@ a name here prints, never blocks), `extra_checks` (default `[]`; a host's own ch
 module may import its siblings) and the function is called as `function(root, cfg)`. Its return value is a
 list of findings: a **dict** with `message` plus optional `rel` and `line`, or a **plain string**. Each
 check prints as one line named `extra:<module>.<function>`. They run **only under `check --all`**, exactly
-like the four opt-in gates, and the summary's denominator becomes `9 + the extras that ran` - so a tree
-with no extras still prints `N of 9 gates ran`. An entry that is not `module:function` exits **2**; a
+like the five opt-in gates, and the summary's denominator becomes `10 + the extras that ran` - so a tree
+with no extras still prints `N of 10 gates ran`. An entry that is not `module:function` exits **2**; a
 module that will not import, a function that is absent and a function that raises are each a **finding**,
 never a traceback that ends the run.
 
@@ -230,12 +237,12 @@ path, a path prefix or a glob, a citation matching one is **accepted, not report
 line prints how many it accepted - `ok pointers 108 cited paths in 14 files, 22 accepted absent` - so a
 check that covers less than it claims says so out loud. An entry that matches no citation is itself a
 finding (`FAIL pointers context.config.json: accepted_absent entry "repos/" matched no citation`), so the
-list cannot rot into a list nobody read. **A citation beginning `~/` or `$HOME/` is always accepted, and
+list cannot rot into a list nobody read. **A citation beginning `~/` or `$HOME/` is always accepted, and <!-- leaks:ok -->
 counted in the same number, with no config**: a memory tree may legitimately cite a user-level file, and
 no tree root can resolve one.
 
 **A config that names a gate which does not exist fails loudly.** Any unknown name, in `checks_disabled`,
-`checks_advisory`, `--only` or `--skip`, exits **2** and lists every known name, the eight gates and
+`checks_advisory`, `--only` or `--skip`, exits **2** and lists every known name, the nine gates and
 `installed`, so a typo never reads as a pass and a hook naming a removed gate learns on run one.
 **The one exception is `--only installed`, run alone**: it is the install proof `ADOPT.md` step 6 tells an
 adopter to run, and it never consults those lists, so a host carrying its own legacy gate names still gets
@@ -257,7 +264,7 @@ register     FAIL  13 rows, 13 folders, 0 drained
 leaf-index   ok    12 topics, 27 leaves
 shape        ok    41 files
 caps         ok    41 files
-1 blocking finding; 5 of 9 gates ran; 0 advisory; disabled: none
+1 blocking finding; 5 of 10 gates ran; 0 advisory; disabled: none
 ```
 
 Exit 1. **Two legitimate responses.** *Fix the cause:* decide which copy is stale. If the row is right, the
