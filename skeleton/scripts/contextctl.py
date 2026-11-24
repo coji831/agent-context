@@ -20,6 +20,7 @@ import fnmatch
 import importlib
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,6 +41,8 @@ ENTRY_BEGIN = "<!-- context:begin -->"
 ENTRY_END = "<!-- context:end -->"
 PORTED = re.compile(r"(?m)^\s*(?:<!--\s*)?ported:\s*(\d{4}-\d{2}-\d{2})")
 POINTER = re.compile(r"The rules for this tree are in\s+`([^`]+)`")
+LEAK_ABS = re.compile(r"^(?:[A-Za-z]:[\\/]|/(?:Users|home|root)/|~/|~$|\$HOME[/\\])")
+LEAK_SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".mypy_cache"}
 HEADING = re.compile(r"^##\s+(.*?)\s*$")
 PATH_SUFFIXES = (".md", ".py", ".json", ".yml", ".yaml", ".sh", ".ps1", ".toml", ".txt")
 
@@ -57,6 +60,8 @@ DEFAULTS = {
     "checks_advisory": [],
     "extra_checks": [],
     "leaves": {"max_lines": 120},
+    "leaks": {"roots": ["context"], "suffixes": list(PATH_SUFFIXES),
+              "deny_file": ".leaks-deny.txt", "marker": "leaks:ok"},
     "leaf_pattern": LEAF_PATTERN,
     "briefs": {"threshold": 0.82},
     "artefacts": {
@@ -943,6 +948,82 @@ def gate_pointers(ctx: Ctx) -> Result:
     return Result(gate, findings, tokens, detail)
 
 
+def leaves_tree(ctx: Ctx, source: Path, token: str) -> str:
+    """The reason a backticked token leaves the tree, or "" when it stays inside."""
+    if not token:
+        return ""
+    if LEAK_ABS.match(token):
+        return "is an absolute or home-relative path; a citation must resolve inside this repo"
+    flat = token.replace("\\", "/")
+    if ".." not in flat.split("/"):
+        return ""
+    try:
+        resolved = os.path.normpath(os.path.join(str(source.parent), flat))
+        inside = os.path.commonpath([str(ctx.root), resolved]) == str(ctx.root)
+    except ValueError:
+        inside = False
+    if inside:
+        return ""
+    return "escapes the tree; a citation must resolve inside this repo"
+
+
+def gate_leaks(ctx: Ctx) -> Result:
+    """No citation leaves the tree, and no denied name appears in it.
+
+    Rule 2 of `CONTRIBUTING.md` as a shape: an absolute path, a home-relative one, a `..` that resolves
+    outside the root, or a term from the host's own untracked deny file. Whether an in-tree relative citation
+    exists in *arbitrary* prose is deliberately unchecked - a document about another tree names paths that are
+    absent here, measured at 299 in one runbook - so `pointers` keeps that job for the four files where a
+    citation is tree-root-relative by convention.
+    """
+    gate = "leaks"
+    spec = ctx.cfg.get("leaks") or {}
+    suffixes = tuple(str(s).lower() for s in spec.get("suffixes") or PATH_SUFFIXES)
+    marker = str(spec.get("marker") or "leaks:ok")
+    deny = ctx.root / str(spec.get("deny_file") or ".leaks-deny.txt")
+    roots = [str(r) for r in (spec.get("roots") or ["context"])]
+    terms: list[str] = []
+    if deny.exists():
+        terms = [line.strip() for line in deny.read_text(encoding="utf-8", errors="ignore").splitlines()
+                 if line.strip() and not line.strip().startswith("#")]
+    archive = ctx.root / archive_root(ctx)
+    findings = []
+    files = 0
+    exempt = 0
+    for base in (ctx.root / root for root in roots):
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in suffixes:
+                continue
+            if LEAK_SKIP_DIRS & set(path.parts) or archive == path or archive in path.parents:
+                continue
+            text = ctx.read(path)
+            if text is None:
+                continue
+            files += 1
+            for number, raw in enumerate(text.splitlines(), 1):
+                if marker in raw:
+                    exempt += 1
+                    continue
+                for token in BACKTICK.findall(raw):
+                    reason = leaves_tree(ctx, path, token.strip())
+                    if reason:
+                        findings.append(Finding(gate, ctx.rel(path), number,
+                                                f'"{token.strip()}" {reason}'))
+                for term in terms:
+                    if term.lower() in raw.lower():
+                        findings.append(Finding(gate, ctx.rel(path), number,
+                                                f'"{term}" is on this host\'s deny list; a pointer out of the repo'))
+    if files == 0:
+        exists = any((ctx.root / root).is_dir() for root in roots)
+        return zero(gate, roots[0] if roots else ".", "files", exists)
+    detail = f"{files} files, {len(terms)} deny terms"
+    if exempt:
+        detail += f", {exempt} lines exempt"
+    return Result(gate, findings, files, detail)
+
+
 def gate_ported(ctx: Ctx) -> Result:
     gate = "ported"
     findings = []
@@ -1021,6 +1102,7 @@ CHECKS = [
     ("briefs", gate_briefs, "opt-in"),
     ("verified", gate_verified, "opt-in"),
     ("pointers", gate_pointers, "opt-in"),
+    ("leaks", gate_leaks, "opt-in"),
     ("ported", gate_ported, "opt-in"),
 ]
 GATES = {name: fn for name, fn, _ in CHECKS}

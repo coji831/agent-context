@@ -301,6 +301,10 @@ in its `LOCKED.md` entry; a host that never sets it gets the default, and a host
 once. In 1.2.0 that key is **`archive_dir`** - where a drained topic's files live, `context/archive/` unless the host
 already archives elsewhere.
 
+**1.3.0 adds no key a host must set** - `leaks` is opt-in and has defaults - but it adds a file you may want:
+`.leaks-deny.txt` at the root, **gitignored**, one term per line, for the names a tree must never mention. Create it
+before enabling the gate; with the file absent the gate checks paths only and says `0 deny terms`.
+
 **If the host drained a topic before this release**, it has a shim: a folder under `topics/` holding a `README.md`
 that names the archive and a date. Three choices, in order of preference:
 

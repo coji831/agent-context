@@ -193,12 +193,12 @@ class CleanTree(Base):
         code, out = self.tree.run("check", "--all")
         self.assertEqual(code, 0, out)
         self.assertIn("0 blocking findings", out)
-        self.assertIn("9 of 9 gates ran", out)
+        self.assertIn("10 of 10 gates ran", out)
 
     def test_default_run_is_the_four(self) -> None:
         code, out = self.tree.run("check")
         self.assertEqual(code, 0, out)
-        self.assertIn("5 of 9 gates ran", out)
+        self.assertIn("5 of 10 gates ran", out)
         self.assertNotIn("briefs", out)
 
     def test_run_writes_nothing(self) -> None:
@@ -560,7 +560,7 @@ class AcceptedAbsent(Base):
     """A gitignored directory and a home-relative path are permanent false findings without a list.
 
     The host this was measured on carries `repos/` and `state/` for real, `/`-anchored in `.gitignore`
-    and so absent from every clone, plus two `~/` citations; the retired checker it replaced accepted
+    and so absent from every clone, plus two home-relative citations; the retired checker it replaced accepted
     32 entries and its summary printed how many it had accepted.
     """
 
@@ -1023,6 +1023,66 @@ class DrainedRows(Base):
         self.assertIn("is inside topics_dir", out)
 
 
+class Leaks(Base):
+    """Rule 2 as a shape: no citation leaves the tree, no denied name appears in it."""
+
+    def leaks(self, extra: dict | None = None) -> None:
+        self.tree.config(dict({"leaks": {"roots": ["context"]}}, **(extra or {})))
+        self.tree.git()
+
+    def test_an_absolute_citation_is_a_finding(self) -> None:
+        self.leaks()
+        self.tree.append("context/topics/widget/README.md", "\nsee `C:\\work\\runbook.md`\n")  # leaks:ok
+        self.tree.git()
+        self.assert_fails_with("is an absolute or home-relative path", "check", "--only", "leaks")
+
+    def test_a_home_relative_citation_is_a_finding(self) -> None:
+        self.leaks()
+        self.tree.append("context/topics/widget/README.md", "\nsee `~/notes/rig.md`\n")  # leaks:ok
+        self.tree.git()
+        self.assert_fails_with("is an absolute or home-relative path", "check", "--only", "leaks")
+
+    def test_a_dotdot_that_escapes_is_a_finding(self) -> None:
+        self.leaks()
+        self.tree.append("context/topics/widget/README.md", "\nsee `../../../../outside.md`\n")  # leaks:ok
+        self.tree.git()
+        self.assert_fails_with("escapes the tree", "check", "--only", "leaks")
+
+    def test_a_dotdot_that_stays_inside_is_not(self) -> None:
+        self.leaks()
+        self.tree.append("context/topics/widget/README.md", "\nsee `../README.md`\n")
+        self.tree.git()
+        code, out = self.tree.run("check", "--only", "leaks")
+        self.assertEqual(code, 0, out)
+
+    def test_the_marker_skips_a_line_and_the_count_is_printed(self) -> None:
+        self.leaks()
+        self.tree.append("context/topics/widget/README.md",
+                         "\nthe rule forbids `C:\\` <!-- leaks:ok -->\n")
+        self.tree.git()
+        code, out = self.tree.run("check", "--only", "leaks")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 lines exempt", out)
+
+    def test_a_deny_term_is_a_finding(self) -> None:
+        self.leaks()
+        (self.tree.root / ".leaks-deny.txt").write_text("acme-hub\n", encoding="utf-8")
+        self.tree.append("context/topics/widget/README.md", "\nmeasured on acme-hub last week\n")
+        self.tree.git()
+        self.assert_fails_with("is on this host's deny list", "check", "--only", "leaks")
+
+    def test_an_absent_deny_file_is_counted_not_hidden(self) -> None:
+        self.leaks()
+        code, out = self.tree.run("check", "--only", "leaks")
+        self.assertEqual(code, 0, out)
+        self.assertIn("0 deny terms", out)
+
+    def test_a_scope_that_does_not_exist_is_a_finding(self) -> None:
+        self.tree.config({"leaks": {"roots": ["nowhere"]}})
+        self.tree.git()
+        self.assert_fails_with("that location does not exist", "check", "--only", "leaks")
+
+
 class ExtraChecks(Base):
     """A host attaches its own rules through `extra_checks`; the published tool rejected the key outright.
 
@@ -1058,7 +1118,7 @@ class ExtraChecks(Base):
         code, out = self.tree.run("check", "--all")
         self.assertEqual(code, 0, out)
         self.assertIn("extra:host_checks.clean", out)
-        self.assertIn("10 of 10 gates ran", out)
+        self.assertIn("11 of 11 gates ran", out)
 
     def test_it_runs_only_with_all(self) -> None:
         self.module('def clean(root, cfg):\n    return ["should not run"]\n')
@@ -1066,13 +1126,13 @@ class ExtraChecks(Base):
         code, out = self.tree.run("check")
         self.assertEqual(code, 0, out)
         self.assertNotIn("extra:", out)
-        self.assertIn("5 of 9 gates ran", out)
+        self.assertIn("5 of 10 gates ran", out)
 
     def test_zero_extras_keeps_the_denominator(self) -> None:
         self.configured()
         code, out = self.tree.run("check", "--all")
         self.assertEqual(code, 0, out)
-        self.assertIn("9 of 9 gates ran", out)
+        self.assertIn("10 of 10 gates ran", out)
 
     def test_a_missing_module_is_a_finding_not_a_traceback(self) -> None:
         self.configured("nowhere:policy")
@@ -1173,7 +1233,7 @@ class Cli(Base):
         self.assertEqual(code, 0, out)
         payload = json.loads(out)
         self.assertEqual(payload["exit"], 0)
-        self.assertEqual(len(payload["gates"]), 9)
+        self.assertEqual(len(payload["gates"]), 10)
         self.assertEqual(payload["gates"][0]["gate"], "installed")
 
     def test_disabled_names_are_echoed(self) -> None:
@@ -1190,7 +1250,7 @@ class Cli(Base):
     def test_partial_run_declares_the_full_denominator(self) -> None:
         code, out = self.tree.run("check", "--only", "register")
         self.assertEqual(code, 0, out)
-        self.assertIn("2 of 9 gates ran", out)
+        self.assertIn("2 of 10 gates ran", out)
 
 
 class BriefStub(Base):
