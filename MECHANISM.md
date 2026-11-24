@@ -50,7 +50,7 @@ turn makes - is the table at each turn, the only stage that happens inside a tur
 | T5 | **drain** | work finished or abandoned | every artefact, per the list below | **owner**; **ask** for the plan |
 
 The state line: `no topic -> started -> live (HANDOFF absent or present, alternating with each wrap-up) ->
-drained -> shim`. Only start and drain change the register.
+drained`. Only start and drain change the register, and a drain removes the folder.
 
 **Prevents.** route: writing one repo's model into another's memory. start: a topic on disk that no register
 names. wrap-up: the next session re-deriving from the chat, and a handoff grown to a thousand lines. pick-up:
@@ -61,16 +61,18 @@ an unbounded diary.
 **Drain, artefact by artefact.** `MUST-KNOW.md` distilled then **deleted**; leaves and `decisions.md`
 distilled to a `MEMORY.md` line or a root rule, then the files **archived** - not deleted, because they hold
 the evidence the distilled line rests on; `research/` **moved** if still true, else archived; `JOURNEY.md`
-**archived wholesale**, never deleted - it is the dataset; `plan/` and `HANDOFF.md` **deleted**, a stale
-"next" is a trap; `README.md` **rewritten** into a shim naming the path, what moved, the date checked; the
-register row **rewritten** to say drained. A shim with no date deletes the right copy and points at the wrong
-one.
+**archived wholesale**, never deleted - it is the dataset; `plan/`, `HANDOFF.md` and **the topic folder itself**
+deleted, a stale "next" is a trap and so is a folder a reader can open looking for work that moved; the register
+row **rewritten as an address** - its first cell becomes the archive folder and its date is the day the receipt
+was checked. A row with no date points at nothing checkable.
 
-**Where "archived" means.** `context/archive/`, at the tree root, flat, each file prefixed with its topic name
-(`billing-export-L-0001-export-rate.md`). **Never inside `topics/`**: every gate scopes to `topics_dir`, so an
-archive folder there is read as a live topic and its leaves as live leaves, which fails `register` and
-`leaf-index` on a correct drain. The folder is outside every scan, which is the point of putting it there. The
-default is `[policy]`; a repo that wants another location says so in the shim, which names the path it used.
+**Where "archived" means.** A folder per topic under `archive_dir` - `context/archive/<topic>/` by default - at the
+tree root. **Never inside `topics/`**: every gate scopes to `topics_dir`, so an archive folder there is read as a live
+topic and its leaves as live leaves, which fails `register` and `leaf-index` on a correct drain. The folder is outside
+every scan, which is the point of putting it there, and it carries **two lines introducing itself** - the topic, the
+day it was drained, and where what is still true now lives - because with no shim in the tree nothing else would send
+a reader to it. The default is `[policy]`; a repo that wants another location sets `archive_dir` and the register
+follows.
 
 ## At each turn
 

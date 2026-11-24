@@ -45,8 +45,8 @@ and confusing them is how a topic becomes an unbounded diary.
 1. A request arrives.
 2. It is written down *as it happens* inside a topic: `plan/` while it runs, `HANDOFF.md` at each
    wrap-up, `JOURNEY.md` append-only, `research/` before commitment.
-3. When the topic **drains**, what is still true is distilled to the durable home and the topic becomes a
-   shim. Nothing in a topic is authority.
+3. When the topic **drains**, what is still true is distilled to the durable home, the folder is deleted, and
+   the register row becomes an address. Nothing in a topic is authority.
 
 **A requirement record is host-supplied.** A spec, a locked brief - the thing a chat calls "what must be
 true" - is not an artefact of this tree. Where a host keeps one, the agent does not edit it, and a change
@@ -117,17 +117,21 @@ identity, never order**; dated filenames belong only inside append-only logs.
 | `MUST-KNOW.md` | **distil** to the durable home, then delete the file |
 | `research/` | move to the durable home if still true, else archive |
 | `JOURNEY.md` | **archive wholesale** - never delete; it is the dataset |
-| `plan/`, `HANDOFF.md` | delete - a stale "next" is a trap |
+| `plan/`, `HANDOFF.md`, **the topic folder** | delete - a stale "next" is a trap, and so is a folder a reader can open looking for work that moved |
 | leaves, `decisions.md` | what is still true becomes a line in `MEMORY.md` or a rule in `MUST-KNOW.md`; the leaf itself is archived, not deleted, because it holds the evidence the distilled line rests on |
-| `README.md` | becomes a **shim**: authoritative path, what moved, the date checked |
-| the register row | bump its date and say **drained** |
+| the register row | **rewrite it as an address**: its first cell becomes the archive folder, and its date is the day the receipt was checked |
 
-**Archive means `context/archive/`, at the tree root.** One flat folder, files prefixed with the topic name
-(`<topic>-<original name>`) so two topics can never collide, and **never under `topics/`** - every gate scopes
-itself to `topics_dir`, so a folder there reads as a topic and its leaves as live ones. The location is a
-`[policy]` default, not a concept: a repo that wants its archive elsewhere changes it in one place, the shim,
-which names the path it actually used.
+**No shim.** A drained topic leaves nothing under `topics/`. The register row carries the two things a shim used to
+carry - **where** (the archive folder) and **when** it was checked - and because both are cells rather than prose,
+the gate checks them. The alternative was measured and rejected: a shim folder is an artefact that can look live, and
+two of them cost a host three unreadable `Verified:` lines and a `register` count that overstated live memory.
+
+**Archive means a folder per topic under `archive_dir`**, `context/archive/<topic>/`, at the tree root and **never
+under `topics/`** - every gate scopes itself to `topics_dir`, so a folder there reads as a topic and its leaves as
+live ones. The location is a `[policy]` default, not a concept: a repo that wants its archive elsewhere sets
+`archive_dir` in its config and the register follows. **The folder introduces itself**: two lines saying which topic
+it holds, the day it was drained, and where what is still true now lives - the archive is otherwise never read.
 
 Records and journeys are kept because their value is *historical*; must-know lines are deleted because
-their value is *current*. A shim to an unverified document deletes the correct copy and points at the wrong
-one, so a shim names the path *and* the date.
+their value is *current*. A row that points at an unverified document deletes the correct copy and points at the wrong
+one, so the row names the path *and* the date.

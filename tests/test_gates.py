@@ -959,6 +959,70 @@ class Archive(Base):
         self.assertIn("context/topics/archive: topic has no README.md", out)
 
 
+class DrainedRows(Base):
+    """A drain leaves an address in the register, not a folder.
+
+    Measured on a real host, 2026-11-24: two drained-topic shims made `register` report `9 folders, 9 rows` for
+    seven topics and two receipts, and `briefs` divide by nine for a denominator of seven.
+    """
+
+    def drain(self, archive: str = "context/archive", name: str = "widget", keep_folder: bool = False) -> Path:
+        root = self.tree.root
+        target = root / archive / name
+        target.mkdir(parents=True, exist_ok=True)
+        source = root / "context" / "topics" / name
+        for path in sorted(source.rglob("*")):
+            if path.is_file():
+                (target / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        if not keep_folder:
+            shutil.rmtree(source)
+        index = self.tree.read("context/topics/INDEX.md").replace(
+            f"| `context/topics/{name}/` | the {name} | {TODAY} |",
+            f"| `{archive}/{name}/` | drained - the {name} | {TODAY} |")
+        self.tree.write("context/topics/INDEX.md", index)
+        self.tree.git()
+        return target
+
+    def test_an_address_row_passes_every_gate(self) -> None:
+        self.drain()
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 rows, 0 folders, 1 drained", out)
+
+    def test_a_missing_archive_folder_is_a_finding(self) -> None:
+        target = self.drain()
+        shutil.rmtree(target)
+        self.tree.git()
+        self.assert_fails_with("an archive folder that does not exist", "check")
+
+    def test_a_drained_row_needs_a_date(self) -> None:
+        self.drain()
+        index = self.tree.read("context/topics/INDEX.md").replace(
+            f"| `context/archive/widget/` | drained - the widget | {TODAY} |",
+            "| `context/archive/widget/` | drained - the widget |  |")
+        self.tree.write("context/topics/INDEX.md", index)
+        self.tree.git()
+        self.assert_fails_with('drained row "widget" has no date', "check")
+
+    def test_a_receipt_and_a_live_topic_cannot_share_a_name(self) -> None:
+        self.drain(keep_folder=True)
+        self.assert_fails_with("a receipt and a live topic cannot share a name", "check")
+
+    def test_archive_dir_is_the_hosts_to_set(self) -> None:
+        self.drain(archive="_archive")
+        self.tree.config({"archive_dir": "_archive"})
+        self.tree.git()
+        code, out = self.tree.run("check", "--all")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 drained", out)
+
+    def test_an_archive_inside_topics_is_a_config_error(self) -> None:
+        self.tree.config({"archive_dir": "context/topics/archive"})
+        code, out = self.tree.run("check")
+        self.assertEqual(code, 2, out)
+        self.assertIn("is inside topics_dir", out)
+
+
 class ExtraChecks(Base):
     """A host attaches its own rules through `extra_checks`; the published tool rejected the key outright.
 
