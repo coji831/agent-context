@@ -43,6 +43,7 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | What is the `briefs` similarity threshold? | **0.82.** Measured on 49 pairs: 26 hard negatives (one topic, different conclusions) max at **0.649**; rephrased duplicates score **0.4-0.6**. So 0.82 fires on zero negatives and catches near-verbatim copies only. Losing a duplicate is preferred to firing on a true tree. |
 | Does `verified` block on an uncommitted leaf? | **Yes, and that is accepted.** The only fix left is guessing a date from the working tree, and an uncommitted leaf has no history. A commit clears it. |
 | Is there a document length budget? | **No.** Per-document budgets were tried and retired with their arithmetic, and the aggregate with them. The documents answer one question each and are longer than a guess made before they existed; merging to hit a number puts two subjects in one file. What stays budgeted is the **always-loaded surface**: `664 B` entry file, of which the injected block is `625 B`. |
+| What does a gate do with a topic it cannot read? | **It reports it.** A `README.md` with no line starting `Verified:`, or none at all, is a finding in both `register` and `verified`; a subject the gate cannot read is never dropped from the set in silence. |
 | Which harness behaviours are still unverified? | **A verification plan exists for the two most common harnesses**, Claude Code and Copilot in VS Code. Windsurf and Codex stay queued; no path is guessed into a host. |
 
 ### The history
@@ -50,6 +51,31 @@ construction and is now tested in both directions, so a later refactor cannot qu
 | Question | Ruling |
 | --- | --- |
 | When may the published history be rewritten? | **Force-pushing the history is permitted only until the first fork.** After that, the repository is append-only and every fix is a patch release. The window exists because a pre-publication rewrite costs nobody anything; it closes the moment someone can build on a commit, and nothing about the pattern makes an exception for its own repository. |
+
+## 1.1.1 - the input nobody read
+
+**1.1.1, 2026-11-24.** Two gates skipped a subject instead of failing on it. `verified` built its set from the
+topics it could parse - `dated = [topic for topic in ctx.topics if topic_verified(topic.readme)]` - so a topic whose
+date sat at the end of a line was not a finding, it was not a subject. `register` compared a row's date only
+`if when and verified`, so the same topic's row went unchecked in silence.
+
+**Measured on a host running 1.1.0, 2026-11-24:** three of nine topic `README.md` files were unreadable to
+`VERIFIED_RE` - two drained-topic shims written `> last-updated … · Verified: …`, and one live topic whose line
+began `verified:` - and `verified` reported **6 dated topics** with no finding for the other three. One of the
+unreadable topics carried a real finding the gate had never printed: a `Verified:` **one day behind** its newest
+leaf.
+
+`GATES.md` already stated the principle one subject over: *a gate pinned for a shape the repo does not carry fails
+on the absent path, never on silence.* This release applies the same rule to a gate's own input.
+
+| Was | Is |
+| --- | --- |
+| `verified` counted only the topics it could read and said nothing about the rest | a topic whose `README.md` has no line starting `Verified:`, or has no `README.md`, is a finding that says so |
+| `register` skipped the date comparison whenever the topic's date was unreadable | the same two cases are findings, naming the topic, the reason, and what the reader should do |
+| the summary said `6 dated topics` with no hint that three were unreadable | when nothing is readable it says `0 dated topics, N without a readable date`; otherwise the unreadable topics appear as findings beside the count |
+
+**Tests: 103 before, 107 after.** Four, one per shape: a date at the end of a line, a lowercase `verified:`, and a
+missing `README.md` under each of the two gates.
 
 ## 1.1.0 - the contributor surface
 
